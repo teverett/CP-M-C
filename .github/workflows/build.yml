@@ -17,10 +17,12 @@ jobs:
             sdcc \
             gcc-i686-linux-gnu binutils-i686-linux-gnu \
             qemu-system-x86 qemu-system-data seabios \
+            grub-pc-bin grub-common xorriso mtools \
             python3 make gcc
           sdcc --version | head -1
           i686-linux-gnu-gcc --version | head -1
           qemu-system-i386 --version | head -1
+          grub-mkrescue --version
 
       - name: Build the native Z80 system (SDCC)
         run: make z80
@@ -30,6 +32,11 @@ jobs:
           make i386 I386CC=i686-linux-gnu-gcc I386AS=i686-linux-gnu-as
           make check-i386 I386OBJDUMP=i686-linux-gnu-objdump
           readelf -h -l build/i386/kernel.elf
+
+      - name: Build the boot ISO and system disk image
+        run: |
+          make iso
+          make fsimage
 
       - name: Boot smoke test (prints QEMU diagnostics on failure)
         run: |
@@ -62,6 +69,8 @@ jobs:
           path: |
             build/z80/cpm.bin
             build/i386/kernel.elf
+            build/cpm.iso
+            build/disks/system.img
             build/ref/ccp.bin
             build/ref/bdos.bin
 
@@ -72,18 +81,35 @@ jobs:
 
       - name: Install toolchains
         run: |
-          brew install sdcc i686-elf-gcc qemu
+          brew install sdcc i686-elf-gcc qemu i686-elf-grub
           sdcc --version | head -1
           i686-elf-gcc --version | head -1
           qemu-system-i386 --version | head -1
+          i686-elf-grub-mkrescue --version
 
       - name: Build everything (hosted, Z80, i386)
         run: |
           make
           make check-i386
 
+      - name: Build the boot ISO and system disk image
+        run: |
+          make iso GRUBMKRESCUE=i686-elf-grub-mkrescue
+          make fsimage
+
       - name: Differential tests (original asm vs hosted, Z80, i386/QEMU)
         run: python3 tests/run_tests.py
 
       - name: Extra fuzzing
         run: python3 tests/run_tests.py -k fuzz --fuzz-seeds 30
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpm22-c-macos
+          path: |
+            build/z80/cpm.bin
+            build/i386/kernel.elf
+            build/cpm.iso
+            build/disks/system.img
+            build/ref/ccp.bin
+            build/ref/bdos.bin
