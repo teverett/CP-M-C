@@ -29,6 +29,7 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
     make test                      # build everything and run the differential tests
     build/cpm -A a.img -i script   # run the C port on the hosted test machine
     make run-i386                  # boot CP/M on a bare-metal i386 kernel in QEMU
+    ./run.sh                       # same, as a standalone script (builds first if needed)
     make iso                       # build a bootable ISO (BIOS/El Torito) -> build/cpm.iso
     make fsimage                   # build the i386 system disk -> build/disks/system.img
 
