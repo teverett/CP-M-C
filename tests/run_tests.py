@@ -95,7 +95,13 @@ def run_i386(script, disks, flags, cwd):
         r = subprocess.run(args, capture_output=True, timeout=300,
                            stdin=subprocess.DEVNULL)
         out, rc = r.stdout, r.returncode
-        rc = (rc >> 1) if rc & 1 else -rc
+        # isa-debug-exit: status = ((0x20 + code) << 1) | 1; anything lower
+        # is QEMU itself failing (e.g. it could not load the kernel)
+        if rc & 1 and rc >= 0x41:
+            rc = (rc >> 1) - 0x20
+        else:
+            err += b'\n[qemu exit status %d]' % rc
+            rc = -1000 - rc
         err = r.stderr
     except subprocess.TimeoutExpired:
         out, err, rc = b'', b'TIMEOUT', -1

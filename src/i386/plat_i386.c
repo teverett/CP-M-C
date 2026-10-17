@@ -164,9 +164,13 @@ static uint8_t secbuf[512];
 static uint32_t script_cached = 0xFFFFFFFFu;
 static int32_t inject_reads;
 
+/* isa-debug-exit makes QEMU exit with status (value << 1) | 1.  Offsetting
+ * the value keeps every real exit status above QEMU's own error status 1. */
+#define EXIT_BASE 0x20
+
 void plat_exit(int code)
 {
-    outl(0xF4, (uint32_t)code);
+    outl(0xF4, (uint32_t)(EXIT_BASE + code));
     for (;;)
         __asm__ volatile("hlt");
 }

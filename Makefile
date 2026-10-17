@@ -103,7 +103,8 @@ build/i386/rt.o: src/i386/rt.c
 	$(I386CC) $(I386FLAGS) -c $< -o $@
 
 build/i386/kernel.elf: $(I386OBJ) src/i386/link.ld
-	$(I386CC) -T src/i386/link.ld -o $@ -ffreestanding -nostdlib -no-pie $(I386OBJ) -lgcc
+	$(I386CC) -T src/i386/link.ld -o $@ -ffreestanding -nostdlib -no-pie -Wl,--build-id=none \
+	    $(I386OBJ) -lgcc
 
 # Fail if the kernel contains SSE/MMX/x87 instructions (it would reset in QEMU)
 check-i386: build/i386/kernel.elf

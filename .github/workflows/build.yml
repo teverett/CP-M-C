@@ -13,10 +13,10 @@ jobs:
       - name: Install toolchains
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             sdcc \
             gcc-i686-linux-gnu binutils-i686-linux-gnu \
-            qemu-system-x86 \
+            qemu-system-x86 qemu-system-data seabios \
             python3 make gcc
           sdcc --version | head -1
           i686-linux-gnu-gcc --version | head -1
@@ -44,7 +44,7 @@ jobs:
             -serial file:build/smoke.list -serial file:build/smoke.diag \
             -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
             </dev/null | od -c | head -5
-          echo "qemu status ${PIPESTATUS[0]} (1 = clean exit)"
+          echo "qemu status ${PIPESTATUS[0]} (65 = clean exit)"
           cat build/smoke.diag
 
       - name: Build the test host and reference binaries
