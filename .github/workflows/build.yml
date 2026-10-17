@@ -26,7 +26,26 @@ jobs:
         run: make z80
 
       - name: Build the bare-metal i386 kernel
-        run: make i386 I386CC=i686-linux-gnu-gcc I386AS=i686-linux-gnu-as
+        run: |
+          make i386 I386CC=i686-linux-gnu-gcc I386AS=i686-linux-gnu-as
+          make check-i386 I386OBJDUMP=i686-linux-gnu-objdump
+          readelf -h -l build/i386/kernel.elf
+
+      - name: Boot smoke test (prints QEMU diagnostics on failure)
+        run: |
+          python3 tools/mkdisk.py 0 build/smoke-a.img
+          printf 'dir\n' > build/smoke.in
+          python3 tools/mkimage.py -o build/smoke.img -A build/smoke-a.img -s build/smoke.in
+          set +e
+          timeout 60 qemu-system-i386 -display none -monitor none -no-reboot -m 16 \
+            -kernel build/i386/kernel.elf \
+            -drive file=build/smoke.img,format=raw,if=ide \
+            -chardev stdio,id=c0 -serial chardev:c0 \
+            -serial file:build/smoke.list -serial file:build/smoke.diag \
+            -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+            </dev/null | od -c | head -5
+          echo "qemu status ${PIPESTATUS[0]} (1 = clean exit)"
+          cat build/smoke.diag
 
       - name: Build the test host and reference binaries
         run: make build/cpm build/ref/ccp.bin build/ref/bdos.bin

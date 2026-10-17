@@ -174,6 +174,8 @@ def compare(case, ro, rp, label):
         i = first_diff(ro[0], rp[0])
         problems.append('%s: console differs at %d:\n   ref : %s\n   %s: %s'
                         % (label, i, show(ro[0], i), label, show(rp[0], i)))
+        if rp[1]:
+            problems.append('%s: stderr/diagnostics: %r' % (label, rp[1][-300:]))
     if ro[2] != rp[2]:
         problems.append('%s: exit status ref=%d got=%d (%r / %r)'
                         % (label, ro[2], rp[2], ro[1][-200:], rp[1][-200:]))

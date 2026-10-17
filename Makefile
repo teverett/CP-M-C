@@ -27,7 +27,7 @@ test: all
 clean:
 	rm -rf build
 
-.PHONY: all test clean z80 i386 run-i386
+.PHONY: all test clean z80 i386 run-i386 check-i386
 
 # --- native Z80 build (SDCC) -------------------------------------------
 # The same C compiled to Z80 code.  Memory map: TPA 0100-9FFF, CCP data at
@@ -64,8 +64,14 @@ build/z80/cpm.bin: build/z80/cpm.ihx
 # --- bare-metal i386 build (run under QEMU) -------------------------------
 I386CC    ?= i686-elf-gcc
 I386AS    ?= i686-elf-as
+I386OBJDUMP ?= i686-elf-objdump
 QEMU386   ?= qemu-system-i386
-I386FLAGS  = -m32 -ffreestanding -fno-pie -fno-stack-protector -O2 -Wall -Wextra \
+# The kernel has no IDT and never enables SSE/x87, so it must use general
+# registers only; do not rely on the compiler's default -march (Ubuntu's
+# cross compiler defaults to one that emits SSE and the guest then resets).
+I386FLAGS  = -m32 -march=i686 -mgeneral-regs-only -ffreestanding -fno-pie \
+             -fno-stack-protector -fcf-protection=none \
+             -fno-asynchronous-unwind-tables -O2 -Wall -Wextra \
              -Isrc -Isrc/i386 -Isrc/8080
 I386SRC    = machine bios bdos ccp 8080/i8080
 I386OBJ    = build/i386/boot.o \
@@ -98,6 +104,12 @@ build/i386/rt.o: src/i386/rt.c
 
 build/i386/kernel.elf: $(I386OBJ) src/i386/link.ld
 	$(I386CC) -T src/i386/link.ld -o $@ -ffreestanding -nostdlib -no-pie $(I386OBJ) -lgcc
+
+# Fail if the kernel contains SSE/MMX/x87 instructions (it would reset in QEMU)
+check-i386: build/i386/kernel.elf
+	@if $(I386OBJDUMP) -d $< | grep -Eq '%(xmm|mm[0-7]|st)|\b(fld|fst|fild|fistp|movaps|movups|movdqa|movdqu)'; then \
+	    echo "kernel.elf uses SSE/x87 instructions"; exit 1; \
+	else echo "kernel.elf: general registers only"; fi
 
 # Interactive CP/M on QEMU's serial console (Ctrl-A X quits).  Blank formatted
 # disks are created in build/disks/{A,B,C}.img if missing; put your own
