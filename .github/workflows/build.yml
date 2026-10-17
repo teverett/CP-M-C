@@ -84,7 +84,7 @@ jobs:
 
       - name: Install toolchains
         run: |
-          brew install sdcc i686-elf-gcc qemu i686-elf-grub
+          brew install sdcc i686-elf-gcc qemu i686-elf-grub xorriso
           sdcc --version | head -1
           i686-elf-gcc --version | head -1
           qemu-system-i386 --version | head -1
