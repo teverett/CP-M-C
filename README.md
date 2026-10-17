@@ -30,6 +30,7 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
     build/cpm -A a.img -i script   # run the C port on the hosted test machine
     make run-i386                  # boot CP/M on a bare-metal i386 kernel in QEMU
     make iso                       # build a bootable ISO (BIOS/El Torito) -> build/cpm.iso
+    make fsimage                   # build the i386 system disk -> build/disks/system.img
 
 Prerequisites: a C compiler, `make` and Python 3 for the hosted build and the
 tests; [SDCC](https://sdcc.sourceforge.net/) for the Z80 build; an i386 cross
@@ -85,6 +86,13 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   it is compiled with `-mgeneral-regs-only` (`make check-i386` enforces it).
   `make run-i386` creates blank formatted disks in `build/disks/` if needed;
   put images built with `tools/mkdisk.py` there to use your own.
+* **fsimage** (`make fsimage`): builds the i386 system disk,
+  `build/disks/system.img`, from blank formatted drives in `build/disks/`
+  (`A.img`/`B.img`/`C.img`, created by `tools/mkdisk.py` if missing — drop
+  your own images there first to use them) packed by `tools/mkimage.py`.
+  `run-i386` depends on this target too, so `make fsimage` on its own is
+  mainly for pairing with `make iso` when QEMU itself isn't driving the VM
+  (e.g. handing both files to Proxmox).
 * **iso** (`make iso`): wraps `build/i386/kernel.elf` in a GRUB/El Torito
   bootable ISO (`build/cpm.iso`) for hypervisors that boot from CD rather than
   QEMU's `-kernel` flag, such as Proxmox. Needs `grub-mkrescue` (Homebrew:
@@ -92,9 +100,10 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   Debian/Ubuntu: `apt install grub-pc-bin xorriso`). GRUB loads the kernel via
   the multiboot header, same as QEMU's `-kernel`. The CP/M disks are *not* on
   the ISO: in Proxmox, create the VM as BIOS/SeaBIOS (not UEFI), attach
-  `build/cpm.iso` as the CD-ROM (boot order: CD first), and attach a system
-  disk image built with `tools/mkimage.py` as an IDE or SATA drive — console
-  is the VM's serial port (COM1), not the display. Sanity-check locally first:
+  `build/cpm.iso` as the CD-ROM (boot order: CD first), and attach
+  `build/disks/system.img` (`make fsimage`, below) as an IDE or SATA drive —
+  console is the VM's serial port (COM1), not the display. Sanity-check
+  locally first:
 
       qemu-system-i386 -m 16 -cdrom build/cpm.iso -boot d \
           -drive file=build/disks/system.img,format=raw,if=ide -serial mon:stdio

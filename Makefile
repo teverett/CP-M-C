@@ -27,7 +27,7 @@ test: all
 clean:
 	rm -rf build
 
-.PHONY: all test clean z80 i386 run-i386 check-i386 iso
+.PHONY: all test clean z80 i386 run-i386 check-i386 iso fsimage
 
 # --- native Z80 build (SDCC) -------------------------------------------
 # The same C compiled to Z80 code.  Memory map: TPA 0100-9FFF, CCP data at
@@ -138,10 +138,18 @@ build/disks/C.img:
 	@mkdir -p build/disks
 	$(PYTHON) tools/mkdisk.py 2 $@
 
-# The system disk is rebuilt on every run so that it picks up the images.
-run-i386: build/i386/kernel.elf build/disks/A.img build/disks/B.img build/disks/C.img
-	$(PYTHON) tools/mkimage.py -o build/disks/system.img \
+# The system disk image for the i386 build: drives A/B/C packed into the
+# single IDE image the kernel reads (src/i386/boot_hdr.h). Rebuilt whenever
+# the per-drive images change; needed alongside build/cpm.iso for hypervisors
+# (e.g. Proxmox) that cannot use QEMU's -kernel flag directly.
+fsimage: build/disks/system.img
+
+build/disks/system.img: build/disks/A.img build/disks/B.img build/disks/C.img tools/mkimage.py
+	$(PYTHON) tools/mkimage.py -o $@ \
 	    -A build/disks/A.img -B build/disks/B.img -C build/disks/C.img
+
+# The system disk is rebuilt on every run so that it picks up the images.
+run-i386: build/i386/kernel.elf build/disks/system.img
 	$(QEMU386) -nographic -nic none -m 16 -kernel build/i386/kernel.elf \
 	    -drive file=build/disks/system.img,format=raw,if=ide \
 	    -serial mon:stdio -serial file:build/disks/list.out \
