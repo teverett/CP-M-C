@@ -153,4 +153,7 @@ and uploads the binaries as an artifact.  On macOS (Homebrew `sdcc`,
 the same suite.  Dependabot keeps the actions up to date
 (`.github/dependabot.yml`).
 
-The original source is Copyright Digital Research; see `orig/LICENSE.txt`.
+## License
+
+The C port is BSD 3-Clause licensed; see `LICENSE`. The original assembly
+source is Copyright Digital Research; see `orig/LICENSE.txt`.
