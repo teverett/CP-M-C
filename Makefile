@@ -27,7 +27,7 @@ test: all
 clean:
 	rm -rf build
 
-.PHONY: all test clean z80 i386 run-i386 check-i386
+.PHONY: all test clean z80 i386 run-i386 check-i386 iso
 
 # --- native Z80 build (SDCC) -------------------------------------------
 # The same C compiled to Z80 code.  Memory map: TPA 0100-9FFF, CCP data at
@@ -79,6 +79,19 @@ I386OBJ    = build/i386/boot.o \
              build/i386/plat_i386.o build/i386/rt.o
 
 i386: build/i386/kernel.elf
+
+# --- bootable ISO (GRUB/El Torito, BIOS boot) for Proxmox/QEMU/VirtualBox --
+# The CP/M disks are not on the ISO: attach build/disks/system.img (made by
+# tools/mkimage.py) as a separate IDE/SATA drive, and boot the ISO as the CD.
+GRUBMKRESCUE ?= grub-mkrescue
+
+iso: build/cpm.iso
+
+build/cpm.iso: build/i386/kernel.elf src/i386/grub.cfg
+	@mkdir -p build/iso/boot/grub
+	cp build/i386/kernel.elf build/iso/boot/kernel.elf
+	cp src/i386/grub.cfg build/iso/boot/grub/grub.cfg
+	$(GRUBMKRESCUE) -o $@ build/iso
 
 build/i386/boot.o: src/i386/boot.s
 	@mkdir -p build/i386
