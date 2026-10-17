@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # The only dependencies are the GitHub Actions used by the workflow
+  # (the toolchains come from apt, and there are no package manifests).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"

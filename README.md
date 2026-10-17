@@ -1,3 +1,5 @@
+[![build](https://github.com/teverett/CP-M-C/actions/workflows/build.yml/badge.svg)](https://github.com/teverett/CP-M-C/actions/workflows/build.yml)
+
 # CP/M 2.2 CCP and BDOS in C
 
 A routine-by-routine translation of the Digital Research CP/M 2.2 console
