@@ -5,5 +5,9 @@
 	call	5
 	lda	4
 	mov	c,a
-	lxi	h,0dc03h
+	lhld	6		; BDOS entry; the CCP is 800h below the BDOS
+	mov	a,h
+	sui	8
+	mov	h,a
+	mvi	l,3
 	pchl

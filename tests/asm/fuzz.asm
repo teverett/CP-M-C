@@ -1,7 +1,8 @@
 ; FUZZ.COM - table driven BDOS exerciser.  A table of calls is appended to
 ; the program by the test generator.  Record format:
-;   func, dumpflag, addr(lo,hi), nbytes, bytes...   (func 0ffh ends)
-; nbytes bytes are copied to addr before the call; DE = addr for the call.
+;   func, dumpflag, addr(lo,hi), nbytes, repeat, bytes...  (func 0ffh ends)
+; nbytes bytes are copied to addr, then the call is made `repeat` times
+; with DE = addr.
 ; The DMA buffer (80h..0ffh) is filled with a running pattern first.
 ; After the call it prints: func A B HL checksum(80h..0ffh) [36 bytes at addr]
 	org	100h
@@ -28,6 +29,9 @@ next:	lhld	tp
 	xchg
 	mov	b,m
 	inx	h
+	mov	a,m
+	sta	rep
+	inx	h
 	mov	a,b
 	ora	a
 	jz	nocopy
@@ -41,7 +45,7 @@ cp:	mov	a,m
 	dcr	b
 	jnz	cp
 nocopy:	shld	tp
-	; fill the dma buffer with a pattern
+again:	; fill the dma buffer with a pattern
 	lda	cnt
 	mvi	b,128
 	lxi	h,80h
@@ -106,6 +110,10 @@ eol:	mvi	e,13
 	mvi	e,10
 	mvi	c,2
 	call	5
+	lda	rep
+	dcr	a
+	sta	rep
+	jnz	again
 	jmp	next
 done:	jmp	0
 
@@ -141,6 +149,7 @@ faddr:	ds	2
 func:	ds	1
 dump:	ds	1
 cnt:	ds	1
+rep:	ds	1
 ra:	ds	1
 rb:	ds	1
 rhl:	ds	2

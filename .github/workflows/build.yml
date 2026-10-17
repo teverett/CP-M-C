@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            sdcc \
+            gcc-i686-linux-gnu binutils-i686-linux-gnu \
+            qemu-system-x86 \
+            python3 make gcc
+          sdcc --version | head -1
+          i686-linux-gnu-gcc --version | head -1
+          qemu-system-i386 --version | head -1
+
+      - name: Build the native Z80 system (SDCC)
+        run: make z80
+
+      - name: Build the bare-metal i386 kernel
+        run: make i386 I386CC=i686-linux-gnu-gcc I386AS=i686-linux-gnu-as
+
+      - name: Build the test host and reference binaries
+        run: make build/cpm build/ref/ccp.bin build/ref/bdos.bin
+
+      - name: Differential tests (original asm vs hosted, Z80, i386/QEMU)
+        run: python3 tests/run_tests.py
+
+      - name: Extra fuzzing
+        run: python3 tests/run_tests.py -k fuzz --fuzz-seeds 60
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpm22-c
+          path: |
+            build/z80/cpm.bin
+            build/i386/kernel.elf
+            build/ref/ccp.bin
+            build/ref/bdos.bin

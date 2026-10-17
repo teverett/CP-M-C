@@ -14,12 +14,12 @@
  * Original: Copyright (c) 1978, 1979, 1980 Digital Research.
  */
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "cpm.h"
 
-const cpm_bios *bios;
+#ifdef CPM_HOSTED
+#include <stdio.h>
 int bdos_trace;
+#endif
 
 #define ON_TRUE   0xFF
 #define ON_FALSE  0x00
@@ -143,10 +143,8 @@ static void selsub(void);
 static void rodsub(void);
 static void rofsub(void);
 
-bdos_errfn pererr = persub;
-bdos_errfn selerr = selsub;
-bdos_errfn roderr = rodsub;
-bdos_errfn roferr = rofsub;
+/* set in bdos_init() (no initialized data, so this builds for ROM/native) */
+bdos_errfn pererr, selerr, roderr, roferr;
 
 void bdos_init(void)
 {
@@ -173,11 +171,12 @@ void bdos_init(void)
 }
 
 /* jmp reboot */
-static void reboot(void) __attribute__((noreturn));
+static void reboot(void) NORETURN;
 static void reboot(void)
 {
     bios->wboot();
-    abort();                     /* wboot must not return */
+    for (;;)                     /* wboot must not return */
+        ;
 }
 
 /* ------------------------------------------------------------------ */
@@ -603,7 +602,7 @@ static void seek(void)
     uint16_t bc = arecord;       /* arecord */
     uint16_t de = rw(curreca);   /* currec  */
     uint16_t hl = rw(curtrka);   /* curtrk  */
-    uint32_t t;
+    uint16_t t;
 
     /* loop while arecord < currec */
     while (bc < de) {
@@ -612,12 +611,12 @@ static void seek(void)
     }
     /* look while arecord >= (t:=currec + sectpt) */
     for (;;) {
-        t = (uint32_t)sectpt + de;
-        if (t > 0xFFFF)                 /* can be > FFFFH */
+        t = (uint16_t)(sectpt + de);
+        if (t < de)                     /* can be > FFFFH */
             break;
         if (bc < t)                     /* skip if t > arecord */
             break;
-        de = (uint16_t)t;               /* currec = t */
+        de = t;                         /* currec = t */
         hl++;                           /* curtrk = curtrk + 1 */
     }
     bios->settrk((uint16_t)(offset + hl));
@@ -1818,7 +1817,7 @@ static void copy_dirloc(void)
 /* ------------------------------------------------------------------ */
 /* individual function handlers                                        */
 
-static void func0(void) { bios->wboot(); abort(); }
+static void func0(void) { reboot(); }
 
 static void func1(void)
 {
@@ -2015,8 +2014,10 @@ uint16_t bdos_call(uint8_t c, uint16_t de)
 {
     uint8_t e = (uint8_t)de;
 
+#ifdef CPM_HOSTED
     if (bdos_trace && !(c == 2 || c == 6))
         fprintf(stderr, "bdos %02X %04X\n", c, de);
+#endif
     info = de;
     linfo = e;                   /* linfo = low(info) - don't equ */
     aret = 0;                    /* return value defaults to 0000 */
@@ -2072,7 +2073,9 @@ uint16_t bdos_call(uint8_t c, uint16_t de)
     } else {
         goback();
     }
+#ifdef CPM_HOSTED
     if (bdos_trace && !(c == 2 || c == 6))
         fprintf(stderr, "  = %04X\n", aret);
+#endif
     return aret;
 }

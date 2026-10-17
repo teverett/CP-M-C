@@ -9,9 +9,7 @@
  *
  * Original: Copyright (c) 1976-1980 Digital Research.
  */
-#include <setjmp.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include "cpm.h"
 
 #define CR     13
@@ -67,15 +65,13 @@ static uint8_t  cdisk;          /* current disk */
 static uint8_t  sdisk;          /* selected disk for current operation */
 static uint8_t  bptr;           /* buffer pointer */
 
-void (*ccp_run_tpa)(void);
-
-static jmp_buf ccp_jmp;
+static cpm_jmpbuf ccp_jmp;
 
 /* jmp ccp */
-static void ccp_restart(void) __attribute__((noreturn));
+static void ccp_restart(void) NORETURN;
 static void ccp_restart(void)
 {
-    longjmp(ccp_jmp, 1);
+    cpm_longjmp(ccp_jmp);
 }
 
 /* ------------------------------------------------------------------ */
@@ -347,11 +343,11 @@ noread:
 
 static const uint8_t serial[6] = { 0, 0, 0, 0, 0, 0 };
 
-static void badserial(void) __attribute__((noreturn));
+static void badserial(void) NORETURN;
 static void badserial(void)
 {
     /* the original stored DI/HLT at the CCP base and jumped to it */
-    host_halt();
+    cpm_halt();
 }
 
 static void serialize(void)
@@ -359,11 +355,11 @@ static void serialize(void)
     /* check serialization (six bytes at the BDOS base) */
     int i;
     for (i = 0; i < 6; i++)
-        if (serial[i] != rb((uint16_t)(BDOS_BASE + i)))
+        if (serial[i] != rb((uint16_t)(CCP_SERIAL + i)))
             badserial();
 }
 
-static void comerr(void) __attribute__((noreturn));
+static void comerr(void) NORETURN;
 static void comerr(void)
 {
     /* error in command string starting at position 'staddr' and ending
@@ -1085,7 +1081,7 @@ void ccp_start(uint8_t c)
     /* check for initial command */
     have_cmd = rb(COMLEN) != 0;  /* assume typed already */
 
-    setjmp(ccp_jmp);             /* "ccp:" - enter on each command or error */
+    cpm_setjmp(ccp_jmp);         /* "ccp:" - enter on each command or error */
     for (;;) {
         uint8_t i;
         if (!have_cmd) {

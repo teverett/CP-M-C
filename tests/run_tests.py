@@ -17,8 +17,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, 'build')
 CPM = os.path.join(BUILD, 'cpm')
 REF = os.path.join(BUILD, 'ref')
+Z80BIN = os.path.join(BUILD, 'z80', 'cpm.bin')
+I386ELF = os.path.join(BUILD, 'i386', 'kernel.elf')
+QEMU = os.environ.get('QEMU386', 'qemu-system-i386')
+TARGETS = ['port', 'z80', 'i386']  # compared against the reference
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import mkdisk  # noqa: E402
+import mkimage  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -60,10 +65,58 @@ def pattern(n, seed):
     return bytes(r.randrange(256) for _ in range(n))
 
 
+def run_i386(script, disks, flags, cwd):
+    typeahead = '-t' in flags
+    err_track = -1
+    inject = None
+    fl = list(flags)
+    i = 0
+    while i < len(fl):
+        if fl[i] == '-e':
+            err_track = int(fl[i + 1]); i += 2
+        elif fl[i] == '-x':
+            n, d, o, v = (int(x) for x in fl[i + 1].split(':'))
+            inject = (n, d, o, v); i += 2
+        else:
+            i += 1                    # -t, -m are handled/ignored
+    img = mkimage.build(disks, script, typeahead, err_track, inject)
+    sysimg = os.path.join(cwd, 'sys.img')
+    with open(sysimg, 'wb') as f:
+        f.write(img)
+    lst = os.path.join(cwd, 'list')
+    diag = os.path.join(cwd, 'diag')
+    args = [QEMU, '-display', 'none', '-monitor', 'none', '-no-reboot',
+            '-m', '16', '-kernel', I386ELF,
+            '-drive', 'file=%s,format=raw,if=ide' % sysimg,
+            '-chardev', 'stdio,id=c0', '-serial', 'chardev:c0',
+            '-serial', 'file:' + lst, '-serial', 'file:' + diag,
+            '-device', 'isa-debug-exit,iobase=0xf4,iosize=0x04']
+    try:
+        r = subprocess.run(args, capture_output=True, timeout=300,
+                           stdin=subprocess.DEVNULL)
+        out, rc = r.stdout, r.returncode
+        rc = (rc >> 1) if rc & 1 else -rc
+        err = r.stderr
+    except subprocess.TimeoutExpired:
+        out, err, rc = b'', b'TIMEOUT', -1
+    with open(diag, 'rb') as f:
+        err += f.read()
+    with open(sysimg, 'rb') as f:
+        final = f.read()
+    images = {l: mkimage.extract(final, l) for l in disks}
+    with open(lst, 'rb') as f:
+        listing = f.read()
+    return out, err, rc, images, listing
+
+
 def run_one(mode, script, disks, flags, cwd):
+    if mode == 'i386':
+        return run_i386(script, disks, flags, cwd)
     args = [CPM]
     if mode == 'ref':
         args += ['-r', REF]
+    elif mode == 'z80':
+        args += ['-z', Z80BIN]
     args += list(flags)
     inp = os.path.join(cwd, 'in')
     with open(inp, 'wb') as f:
@@ -106,39 +159,49 @@ def show(b, pos, w=60):
 
 
 class Case:
-    def __init__(self, name, script, disks=None, flags=(), rc=0):
+    def __init__(self, name, script, disks=None, flags=(), rc=0, only=None):
         self.rc = rc
+        self.only = only          # restrict to these targets (layout-specific)
         self.name = name
         self.script = script
         self.disks = disks or {}
         self.flags = flags
 
 
+def compare(case, ro, rp, label):
+    problems = []
+    if ro[0] != rp[0]:
+        i = first_diff(ro[0], rp[0])
+        problems.append('%s: console differs at %d:\n   ref : %s\n   %s: %s'
+                        % (label, i, show(ro[0], i), label, show(rp[0], i)))
+    if ro[2] != rp[2]:
+        problems.append('%s: exit status ref=%d got=%d (%r / %r)'
+                        % (label, ro[2], rp[2], ro[1][-200:], rp[1][-200:]))
+    for letter in ro[3]:
+        a, b = ro[3][letter], rp[3].get(letter)
+        if a != b:
+            i = first_diff(a, b or b'')
+            problems.append('%s: disk %s differs at byte %d (sector %d)'
+                            % (label, letter, i, i // 128))
+    if ro[4] != rp[4]:
+        problems.append('%s: list output differs' % label)
+    return problems
+
+
 def check(case, verbose):
     tmp = tempfile.mkdtemp(prefix='cpmtest')
     try:
         res = {}
-        for mode in ('ref', 'port'):
+        for mode in ['ref'] + [t for t in TARGETS
+                               if case.only is None or t in case.only]:
             cwd = os.path.join(tmp, mode)
             os.mkdir(cwd)
             res[mode] = run_one(mode, case.script, case.disks, case.flags, cwd)
-        ro, rp = res['ref'], res['port']
+        ro = res['ref']
         problems = []
-        if ro[0] != rp[0]:
-            i = first_diff(ro[0], rp[0])
-            problems.append('console differs at %d:\n   ref : %s\n   port: %s'
-                            % (i, show(ro[0], i), show(rp[0], i)))
-        if ro[2] != rp[2]:
-            problems.append('exit status ref=%d port=%d (%r / %r)'
-                            % (ro[2], rp[2], ro[1][-200:], rp[1][-200:]))
-        for letter in ro[3]:
-            a, b = ro[3][letter], rp[3].get(letter)
-            if a != b:
-                i = first_diff(a, b or b'')
-                problems.append('disk %s differs at byte %d (sector %d)'
-                                % (letter, i, i // 128))
-        if ro[4] != rp[4]:
-            problems.append('list output differs')
+        for mode in TARGETS:
+            if case.only is None or mode in case.only:
+                problems += compare(case, ro, res[mode], mode)
         if ro[2] != case.rc and not problems:
             problems.append('both exited with status %d (expected %d): %r'
                             % (ro[2], case.rc, ro[1]))
@@ -239,9 +302,11 @@ def ccp_cases():
         Case('ccp/exit-jmp-ccp', S('jmpccp\n', 'dir\n', 'jmpccp2\n'), D),
         Case('ccp/exit-jmp-ccp-user', S('user 2\n', 'jmpccp\n', 'dir\n',
                                         'b:\n', 'jmpccp\n', 'dir\n'), D),
-        Case('ccp/disk-full', S('save 200 f1.dat\n', 'save 200 f2.dat\n',
-                                'save 200 f3.dat\n', 'save 200 f4.dat\n',
-                                'save 200 f5.dat\n', 'dir\n',
+        Case('ccp/disk-full', S('save 150 f1.dat\n', 'save 150 f2.dat\n',
+                                'save 150 f3.dat\n', 'save 150 f4.dat\n',
+                                'save 150 f5.dat\n', 'save 150 f6.dat\n',
+                                'save 150 f7.dat\n', 'save 150 f8.dat\n',
+                                'dir\n',
                                 'era f*.dat\n', 'dir\n'), D),
         Case('ccp/dir-full', S(*['save 0 f%02d.dat\n' % i for i in range(70)],
                                'dir\n'), D),
@@ -354,7 +419,7 @@ def error_cases():
 # ---------------------------------------------------------------------------
 # BDOS call fuzzing
 
-FCB_BASE = 0xC000
+FCB_BASE = 0x9000
 SLOTS = 8
 
 
@@ -371,8 +436,7 @@ def gen_fuzz(seed, ncalls, wild=True):
     log = []
 
     def call(func, de=0, setup=b'', dump=False):
-        out.extend(bytes([func, 1 if dump else 0, de & 255, de >> 8,
-                          len(setup)]) + setup)
+        out.extend(tcall(func, de, setup, dump))
 
     def slot_addr(i):
         return FCB_BASE + i * 64
@@ -405,8 +469,7 @@ def gen_fuzz(seed, ncalls, wild=True):
                 setup = bytes([rec & 255, (rec >> 8) & 255, rec >> 16])
                 func = {'rr': 33, 'rw': 34, 'rz': 40, 'rwfar': 34}[what]
                 # poke r0..r2 using a harmless call (BDOS 12) as the carrier
-                out.extend(bytes([12, 0, (addr + 33) & 255, (addr + 33) >> 8,
-                                  3]) + setup)
+                out.extend(tcall(12, addr + 33, setup))
                 call(func, addr, dump=True)
             elif what == 'close':
                 call(16, addr, dump=True)
@@ -508,8 +571,18 @@ def fuzz_cases(nseeds):
 # ---------------------------------------------------------------------------
 # directed BDOS tests (table programs)
 
-def tcall(func, de=0, setup=b'', dump=False):
-    return bytes([func, 1 if dump else 0, de & 255, de >> 8, len(setup)]) + setup
+def tcall(func, de=0, setup=b'', dump=False, rep=1):
+    return bytes([func, 1 if dump else 0, de & 255, de >> 8, len(setup),
+                  rep]) + setup
+
+
+def treps(func, de, n):
+    out = b''
+    while n > 0:
+        k = min(n, 255)
+        out += tcall(func, de, rep=k)
+        n -= k
+    return out
 
 
 def tpoke(addr, data):
@@ -548,12 +621,12 @@ def directed_cases():
         return {'A': a, 'B': b, 'C': c}
 
     # --- console and misc functions ---
-    io = (tpoke(0xC400, b'Hi there$') + tcall(9, 0xC400) + tcall(1) +
+    io = (tpoke(0x9400, b'Hi there$') + tcall(9, 0x9400) + tcall(1) +
           tcall(6, 0xFF) + tcall(6, 0xFE) + tcall(6, ord('X')) +
           tcall(2, ord('Y')) + tcall(2, 9) + tcall(7) + tcall(8, 0x55) +
           tcall(7) + tcall(3) + tcall(4, ord('P')) + tcall(5, ord('L')) +
-          tcall(10, 0xC500, bytes([20]), True) +
-          tcall(10, 0xC600, bytes([5]), True) + tcall(11) + tcall(38) +
+          tcall(10, 0x9500, bytes([20]), True) +
+          tcall(10, 0x9600, bytes([5]), True) + tcall(11) + tcall(38) +
           tcall(39) + tcall(41) + tcall(0x80) + tcall(6, 0xFF) +
           tcall(6, 0xFF) + tcall(0))
     feed = b'a' + b'b' + b'0123456789\n' + b'\x10zz\x10ab\x7f\x08cdefghij\n'
@@ -619,11 +692,11 @@ def directed_cases():
     # --- big files: module/extent crossing on drive B, disk and dir full ---
     big = (tfcb(0, b'HUGE    DAT', drive=2) +
            tcall(22, taddr(0), dump=True) +
-           tcall(21, taddr(0)) * 4400 +
+           tcall(21, taddr(0), rep=255) * 17 + tcall(21, taddr(0), rep=65) +
            tcall(16, taddr(0), dump=True) + tcall(35, taddr(0), dump=True) +
            tfcb(0, b'HUGE    DAT', drive=2) +
            tcall(15, taddr(0), dump=True) +
-           tcall(20, taddr(0)) * 4400 + tcall(20, taddr(0), dump=True) +
+           tcall(20, taddr(0), rep=255) * 17 + tcall(20, taddr(0), rep=65) + tcall(20, taddr(0), dump=True) +
            tpoke(taddr(0) + 33, bytes([0x40, 0x10, 0])) +
            tcall(33, taddr(0), dump=True) +
            tcall(35, taddr(0), dump=True) + tcall(36, taddr(0), dump=True) +
@@ -635,7 +708,7 @@ def directed_cases():
 
     small = [(0, 'F%02d.DAT' % i, b'') for i in range(58)]
     full = (tfcb(0, b'FILL    DAT', drive=3) + tcall(22, taddr(0), dump=True) +
-            tcall(21, taddr(0)) * 3300 + tcall(16, taddr(0), dump=True) +
+            tcall(21, taddr(0), rep=255) * 12 + tcall(21, taddr(0), rep=240) + tcall(16, taddr(0), dump=True) +
             tcall(0))
     d = disks(c_files=small)
     d['A'] = make_disk(0, [(0, 'FULL.COM', tprog(full))])
@@ -686,7 +759,7 @@ def edge_cases():
              'E64.DAT': pattern(65536, 3)}
     rd = lambda nm, drv, n: (tfcb(0, nm, drive=drv) +
                              tcall(15, taddr(0), dump=True) +
-                             tcall(20, taddr(0)) * n +
+                             treps(20, taddr(0), n) +
                              tcall(20, taddr(0), dump=True) +
                              tcall(20, taddr(0), dump=True) +
                              tcall(35, taddr(0), dump=True) + tcall(0))
@@ -757,9 +830,10 @@ def edge_cases():
     # serial number check
     d = {'A': make_disk(0, [(0, 'BADSER.COM', badser), (0, 'HELLO.COM', hello)]),
          'B': make_disk(1, []), 'C': make_disk(2, [])}
-    cases.append(Case('ccp/bad-serial', b'badser\nhello\ndir\n', d, rc=4))
+    cases.append(Case('ccp/bad-serial', b'badser\nhello\ndir\n', d, rc=4,
+                      only=['port']))
     cases.append(Case('ccp/bad-serial-intrinsic', b'badser\ndir\nhello\n', d,
-                      rc=4))
+                      rc=4, only=['port']))
     return cases
 
 
@@ -773,8 +847,15 @@ def main(argv):
         sub = argv[argv.index('-k') + 1]
     if '--fuzz-seeds' in argv:
         nseeds = int(argv[argv.index('--fuzz-seeds') + 1])
+    global TARGETS
+    if '--targets' in argv:
+        TARGETS = argv[argv.index('--targets') + 1].split(',')
     if not os.path.exists(CPM) or not os.path.exists(REF + '/bdos.bin'):
         sys.exit('run "make" first')
+    if 'z80' in TARGETS and not os.path.exists(Z80BIN):
+        sys.exit('run "make z80" first')
+    if 'i386' in TARGETS and not os.path.exists(I386ELF):
+        sys.exit('run "make i386" first')
     cases = ccp_cases() + error_cases() + directed_cases() + edge_cases() + fuzz_cases(nseeds)
     if sub:
         cases = [c for c in cases if sub in c.name]

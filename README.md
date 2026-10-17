@@ -25,19 +25,43 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 
 | path | what |
 | --- | --- |
-| `src/cpm.h` | memory map, BIOS interface, entry points |
-| `src/bdos.c`, `src/ccp.c` | the port |
-| `src/host.c` | demo "machine": console on stdin/stdout, disk images, BIOS |
-| `src/i8080.c` | 8080 core, used to run `.COM` programs (and the original binaries for testing) |
+| `src/cpm.h` | memory map per target, BIOS interface, entry points |
+| `src/bdos.c`, `src/ccp.c` | the port (identical source for every target) |
+| `src/bios.c`, `src/plat.h`, `src/geom.h` | portable BIOS: disk tables, translation; platform interface |
+| `src/machine.c`, `src/i8080.c` | hosted/i386: 64K memory, boot, 8080 core for `.COM` programs |
+| `src/host.c`, `src/host_z80.c`, `src/z80.c` | test host: stdio console, disk image files, Z80 machine |
+| `src/native.c`, `src/crt0.s`, `src/plat_z80.c` | native Z80 build (SDCC): startup, BDOS entry, port I/O |
+| `src/i386/` | bare-metal i386 build: multiboot stub, UART/ATA/QEMU platform |
 | `orig/` | original assembly |
-| `tools/asm80.py` | minimal 8080 assembler, enough for `orig/*.asm` |
-| `tools/mkdisk.py` | builds test disk images |
+| `tools/` | `asm80.py` (8080 assembler for `orig/`), `mkdisk.py`, `mkimage.py`, `ihx2bin.py` |
 | `tests/` | differential test suite and test programs |
 
-## Build and run
+## Targets
 
-    make            # builds build/cpm and the reference binaries
-    make test       # differential test suite
+The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
+
+    make            # everything below
+    make z80        # native Z80 code with SDCC   -> build/z80/cpm.bin
+    make i386       # bare-metal i386, for QEMU   -> build/i386/kernel.elf
+    make run-i386   # boot it in QEMU on the serial console (Ctrl-A X quits)
+    make test       # differential tests on every target
+
+* **hosted** (`build/cpm`): the C is compiled for your machine and drives a
+  64K `mem[]`.  `.COM` programs run on the built-in 8080 core.  This is the
+  test machine: console on stdin/stdout, disk images as files.
+* **z80** (`make z80`): compiled by SDCC to Z80 code.  The CPU's address space
+  *is* the CP/M address space; programs run natively.  Memory map: TPA
+  `0100`-`9FFF`, CCP data `A000`, BDOS entry page `A800`, compiled code from
+  `A900` (about 10 KB), the BIOS tables at `F300`.  Console and disks are I/O
+  ports (`src/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
+  on the Z80 core in the test host.  SDCC has no 8080 backend, so this is Z80
+  code, not strict 8080 (`.COM` programs, being 8080 code, run fine on it).
+* **i386** (`make i386`): compiled with `i686-elf-gcc` as a freestanding
+  multiboot kernel.  Console is COM1, the list device COM2, and the disks
+  live on an IDE disk (`tools/mkimage.py` builds the QEMU system disk).
+  `.COM` programs run on the same 8080 core as in the hosted build.
+
+## Hosted test machine
 
     build/cpm -A a.img -B b.img -i script.txt
 
@@ -45,10 +69,10 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 on exit).  Console input comes from `-i FILE` or stdin; the program exits
 when the input runs out.  Drive A is an 8" IBM 3740 disk, B has 2K blocks
 with 16-bit block pointers, C has 4K blocks (extent mask 3); D is not
-mounted.  Transient `.COM` programs run on the built-in 8080 core.
-Other options: `-t` (type-ahead visible to the BDOS), `-e TRK` (fail disk
-I/O on a track), `-x N:D:OFF:V` (change an image byte mid-run), `-T` (trace
-BDOS calls).
+mounted.  Other options: `-r DIR` (run the original binaries), `-z FILE`
+(run a native Z80 image), `-t` (type-ahead visible to the BDOS), `-e TRK`
+(fail disk I/O on a track), `-x N:D:OFF:V` (change an image byte mid-run),
+`-T` (trace BDOS calls).
 
 ## How the port is tested
 
@@ -56,10 +80,11 @@ BDOS calls).
 from `orig/` by `tools/asm80.py` at the standard 56K addresses
 (CCP `DC00`, BDOS `E400`, BIOS `F200`), on the 8080 core, using the very same
 BIOS routines.  `tests/run_tests.py` feeds identical console input and
-identical starting disk images to both modes and requires identical console
-output, list output, exit status and final disk images.
+identical starting disk images to the original and to each target (hosted C,
+native Z80 on the Z80 core, bare-metal i386 under QEMU) and requires identical
+console output, list output, exit status and final disk images.
 
-The suite (165 cases) covers CCP command parsing and every intrinsic, line
+The suite (165 cases; `--targets port,z80,i386` selects targets, `--fuzz-seeds N` more random runs) covers CCP command parsing and every intrinsic, line
 editing, submit files, error paths (bad sector, select error, R/O disk, R/O
 file, disk and directory full), console functions, extents and modules, the
 three disk geometries, and seeded random BDOS call sequences.  On the port,
