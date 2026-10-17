@@ -28,9 +28,10 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 | `src/cpm.h` | memory map per target, BIOS interface, entry points |
 | `src/bdos.c`, `src/ccp.c` | the port (identical source for every target) |
 | `src/bios.c`, `src/plat.h`, `src/geom.h` | portable BIOS: disk tables, translation; platform interface |
-| `src/machine.c`, `src/i8080.c` | hosted/i386: 64K memory, boot, 8080 core for `.COM` programs |
-| `src/host.c`, `src/host_z80.c`, `src/z80.c` | test host: stdio console, disk image files, Z80 machine |
-| `src/native.c`, `src/crt0.s`, `src/plat_z80.c` | native Z80 build (SDCC): startup, BDOS entry, port I/O |
+| `src/machine.c` | hosted/i386: 64K memory, boot, runs `.COM` programs |
+| `src/8080/` | the 8080 CPU core (runs `.COM` programs and the original binaries) |
+| `src/host.c` | test host: stdio console, disk image files, options |
+| `src/z80/` | Z80: the native build (SDCC: startup, BDOS entry, port I/O), plus the Z80 core and virtual Z80 machine used to test it |
 | `src/i386/` | bare-metal i386 build: multiboot stub, UART/ATA/QEMU platform |
 | `orig/` | original assembly |
 | `tools/` | `asm80.py` (8080 assembler for `orig/`), `mkdisk.py`, `mkimage.py`, `ihx2bin.py` |
@@ -53,7 +54,7 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   *is* the CP/M address space; programs run natively.  Memory map: TPA
   `0100`-`9FFF`, CCP data `A000`, BDOS entry page `A800`, compiled code from
   `A900` (about 10 KB), the BIOS tables at `F300`.  Console and disks are I/O
-  ports (`src/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
+  ports (`src/z80/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
   on the Z80 core in the test host.  SDCC has no 8080 backend, so this is Z80
   code, not strict 8080 (`.COM` programs, being 8080 code, run fine on it).
 * **i386** (`make i386`): compiled with `i686-elf-gcc` as a freestanding

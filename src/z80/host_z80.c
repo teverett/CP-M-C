@@ -6,12 +6,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include "cpm.h"
-#include "plat.h"
-#include "machine.h"
+#include "../cpm.h"
+#include "../plat.h"
+#include "../machine.h"
 #include "z80.h"
 #include "z80_ports.h"
-#include "host.h"
+#include "../host.h"
 
 static uint8_t drive;
 static uint16_t trk, sec, dma;

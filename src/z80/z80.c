@@ -6,7 +6,7 @@
  * the common cases but nothing relies on them.  No interrupts, no timing.
  */
 #include <stdint.h>
-#include "cpm.h"
+#include "../cpm.h"
 #include "z80.h"
 
 z80_t z80;

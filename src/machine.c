@@ -1,6 +1,6 @@
 /*
  * machine.c - the 64K machine around the port, for the hosted and i386
- * builds (the native Z80 build has native.c instead).
+ * builds (the native Z80 build has z80/native.c instead).
  *
  * Owns mem[], the low-memory vectors, boot and warm boot, and the 8080 CPU
  * used to run transient programs.  When the machine runs in reference mode

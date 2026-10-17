@@ -1,6 +1,6 @@
 /* i8080.c - small Intel 8080 CPU core */
 #include <stdint.h>
-#include "cpm.h"
+#include "../cpm.h"
 #include "i8080.h"
 
 i8080 cpu;

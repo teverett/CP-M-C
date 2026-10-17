@@ -5,8 +5,8 @@
  * jump into the compiled BDOS (see crt0.s).
  */
 #include <stdint.h>
-#include "cpm.h"
-#include "plat.h"
+#include "../cpm.h"
+#include "../plat.h"
 
 #define BDOS_STACK 512
 

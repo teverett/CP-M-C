@@ -1,7 +1,7 @@
 /*
  * plat.h - what the portable BIOS (bios.c) needs from the platform.
  *
- * Implemented by: host.c (hosted test machine), plat_z80.c (native Z80,
+ * Implemented by: host.c (hosted test machine), z80/plat_z80.c (native Z80,
  * via I/O ports) and plat_i386.c (bare-metal PC under QEMU).
  */
 #ifndef PLAT_H

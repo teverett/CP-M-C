@@ -3,8 +3,8 @@
  * and disk "hardware" is a set of I/O ports (see z80_ports.h).
  */
 #include <stdint.h>
-#include "cpm.h"
-#include "plat.h"
+#include "../cpm.h"
+#include "../plat.h"
 #include "z80_ports.h"
 
 __sfr __at (PORT_CON)   p_con;
