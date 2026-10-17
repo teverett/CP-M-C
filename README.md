@@ -14,14 +14,28 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
   (`goto`s included).  Conditions the assembly returned in the Z/C flags are
   C return values; 8080 register pairs are `uint16_t`; 8-bit arithmetic is
   done in `uint8_t` so wrap-around matches.
-* Everything that other code can see lives in a 64K array `mem[]`: FCBs, the
-  command buffer, disk parameter headers/blocks, allocation and checksum
+* Everything that other code can see lives in the 64K CP/M address space (a
+  `mem[]` array in the hosted and i386 builds, the CPU's own memory in the
+  native Z80 build): FCBs, the command buffer, disk parameter headers/blocks, allocation and checksum
   vectors, the DMA buffer.  The BIOS is the `cpm_bios` struct in `src/cpm.h`
   (one member per BIOS jump-table entry).
 * It is **not** byte-identical code: a C compiler cannot reproduce the
   1980 hand-written 8080 object code.  Equivalence is established by
   differential testing instead (below).  The CCP's serial-number check is
-  kept; the original's `DI`/`HLT` trap becomes `host_halt()`.
+  kept; the original's `DI`/`HLT` trap becomes `cpm_halt()`.
+
+## Quick start
+
+    make test                      # build everything and run the differential tests
+    build/cpm -A a.img -i script   # run the C port on the hosted test machine
+    make run-i386                  # boot CP/M on a bare-metal i386 kernel in QEMU
+
+Prerequisites: a C compiler, `make` and Python 3 for the hosted build and the
+tests; [SDCC](https://sdcc.sourceforge.net/) for the Z80 build; an i386 cross
+compiler (`i686-elf-gcc`, or Ubuntu's `gcc-i686-linux-gnu`) and
+`qemu-system-i386` for the i386 build.  On macOS: `brew install sdcc
+i686-elf-gcc qemu`.  `make` builds everything; build a single target with
+`make build/cpm`, `make z80` or `make i386`.
 
 ## Layout
 
@@ -43,11 +57,12 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 
 The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
 
-    make            # everything below
-    make z80        # native Z80 code with SDCC   -> build/z80/cpm.bin
-    make i386       # bare-metal i386, for QEMU   -> build/i386/kernel.elf
-    make run-i386   # boot it in QEMU on the serial console (Ctrl-A X quits)
-    make test       # differential tests on every target
+    make              # everything below
+    make z80          # native Z80 code with SDCC   -> build/z80/cpm.bin
+    make i386         # bare-metal i386, for QEMU   -> build/i386/kernel.elf
+    make check-i386   # verify the kernel uses general registers only
+    make run-i386     # boot it in QEMU on the serial console (Ctrl-A X quits)
+    make test         # differential tests on every target
 
 * **hosted** (`build/cpm`): the C is compiled for your machine and drives a
   64K `mem[]`.  `.COM` programs run on the built-in 8080 core.  This is the
@@ -59,10 +74,16 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   ports (`src/z80/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
   on the Z80 core in the test host.  SDCC has no 8080 backend, so this is Z80
   code, not strict 8080 (`.COM` programs, being 8080 code, run fine on it).
-* **i386** (`make i386`): compiled with `i686-elf-gcc` as a freestanding
-  multiboot kernel.  Console is COM1, the list device COM2, and the disks
-  live on an IDE disk (`tools/mkimage.py` builds the QEMU system disk).
-  `.COM` programs run on the same 8080 core as in the hosted build.
+* **i386** (`make i386`): a freestanding 32-bit kernel (`i686-elf-gcc`, or
+  override `I386CC`/`I386AS`) that QEMU boots with `-kernel`, through either
+  the multiboot header or the PVH ELF note.  Console is COM1, the list device
+  COM2, diagnostics COM3, and the disks live on an IDE disk
+  (`tools/mkimage.py` builds the system disk; layout in
+  `src/i386/boot_hdr.h`).  `.COM` programs run on the same 8080 core as in the
+  hosted build.  The kernel has no interrupt table and never enables SSE, so
+  it is compiled with `-mgeneral-regs-only` (`make check-i386` enforces it).
+  `make run-i386` creates blank formatted disks in `build/disks/` if needed;
+  put images built with `tools/mkdisk.py` there to use your own.
 
 ## Hosted test machine
 
@@ -87,7 +108,11 @@ identical starting disk images to the original and to each target (hosted C,
 native Z80 on the Z80 core, bare-metal i386 under QEMU) and requires identical
 console output, list output, exit status and final disk images.
 
-The suite (165 cases; `--targets port,z80,i386` selects targets, `--fuzz-seeds N` more random runs) covers CCP command parsing and every intrinsic, line
+Run it with `make test` or `python3 tests/run_tests.py` (`-k NAME` selects
+cases, `--targets port,z80,i386` selects targets, `--fuzz-seeds N` runs more
+random call sequences, `-v` lists passing cases too).
+
+The suite (165 cases) covers CCP command parsing and every intrinsic, line
 editing, submit files, error paths (bad sector, select error, R/O disk, R/O
 file, disk and directory full), console functions, extents and modules, the
 three disk geometries, and seeded random BDOS call sequences.  On the port,
@@ -95,10 +120,21 @@ three disk geometries, and seeded random BDOS call sequences.  On the port,
 that need an 8 MB file or a failing close of the submit file, and a few that
 look unreachable.
 
-Known differences from running the original on real hardware: the CCP and
-BDOS code is not in `mem[]`, so a program that reads or patches it sees
-nothing there, and a stray jump into it does not execute it (jumps to the CCP
-entry points `CCP_BASE` and `CCP_BASE+3` are honoured).  Register contents
-other than the documented BDOS results (A, B, HL) are not reproduced.
+Known differences from running the original on real hardware: in the hosted
+and i386 builds the CCP and BDOS code is not in `mem[]`, so a program that
+reads or patches it sees nothing there, and a stray jump into it does not
+execute it (jumps to the CCP entry points `CCP_BASE` and `CCP_BASE+3` are
+honoured).  In the native Z80 build the memory map differs (above), and BIOS
+jump-table entries other than warm boot are stubs for programs that call the
+BIOS directly.  Register contents other than the documented BDOS results (A,
+B, HL) are not reproduced.
+
+## Continuous integration
+
+`.github/workflows/build.yml` builds the Z80 image and the i386 kernel on
+Ubuntu (SDCC and `gcc-i686-linux-gnu` from apt), boots the kernel once as a
+smoke test, then runs the whole differential suite plus extra fuzz seeds, and
+uploads the binaries as an artifact.  Dependabot keeps the actions up to date
+(`.github/dependabot.yml`).
 
 The original source is Copyright Digital Research; see `orig/LICENSE.txt`.
