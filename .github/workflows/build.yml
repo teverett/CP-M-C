@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -113,3 +116,40 @@ jobs:
             build/disks/system.img
             build/ref/ccp.bin
             build/ref/bdos.bin
+
+  release:
+    needs: [build-and-test, build-and-test-macos]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: cpm22-c
+          path: artifacts/linux
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: cpm22-c-macos
+          path: artifacts/macos
+
+      - name: Zip all build artifacts
+        id: zip
+        run: |
+          tag="build-${GITHUB_RUN_NUMBER}-$(git rev-parse --short HEAD)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          cd artifacts
+          zip -r "../cpm22-c-${tag}.zip" .
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.zip.outputs.tag }}
+        run: |
+          gh release create "$TAG" "cpm22-c-${TAG}.zip" \
+            --title "$TAG" \
+            --target "$GITHUB_SHA" \
+            --generate-notes
