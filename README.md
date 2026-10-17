@@ -131,10 +131,12 @@ B, HL) are not reproduced.
 
 ## Continuous integration
 
-`.github/workflows/build.yml` builds the Z80 image and the i386 kernel on
-Ubuntu (SDCC and `gcc-i686-linux-gnu` from apt), boots the kernel once as a
-smoke test, then runs the whole differential suite plus extra fuzz seeds, and
-uploads the binaries as an artifact.  Dependabot keeps the actions up to date
+`.github/workflows/build.yml` has two jobs.  On Ubuntu it builds the Z80 image
+and the i386 kernel (SDCC and `gcc-i686-linux-gnu` from apt), boots the kernel
+once as a smoke test, runs the whole differential suite plus extra fuzz seeds,
+and uploads the binaries as an artifact.  On macOS (Homebrew `sdcc`,
+`i686-elf-gcc`, `qemu`) it does a plain `make`, checks the kernel, and runs
+the same suite.  Dependabot keeps the actions up to date
 (`.github/dependabot.yml`).
 
 The original source is Copyright Digital Research; see `orig/LICENSE.txt`.

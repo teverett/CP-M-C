@@ -64,3 +64,26 @@ jobs:
             build/i386/kernel.elf
             build/ref/ccp.bin
             build/ref/bdos.bin
+
+  build-and-test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchains
+        run: |
+          brew install sdcc i686-elf-gcc qemu
+          sdcc --version | head -1
+          i686-elf-gcc --version | head -1
+          qemu-system-i386 --version | head -1
+
+      - name: Build everything (hosted, Z80, i386)
+        run: |
+          make
+          make check-i386
+
+      - name: Differential tests (original asm vs hosted, Z80, i386/QEMU)
+        run: python3 tests/run_tests.py
+
+      - name: Extra fuzzing
+        run: python3 tests/run_tests.py -k fuzz --fuzz-seeds 30
