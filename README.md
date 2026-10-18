@@ -4,12 +4,12 @@
 
 A routine-by-routine translation of the Digital Research CP/M 2.2 console
 command processor (CCP) and basic disk operating system (BDOS) from 8080
-assembly to C.  The assembly source is in `orig/` (Eric Smith's reformatted
+assembly to C.  The assembly source is in `orig/os/` (Eric Smith's reformatted
 version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 
 ## What "converted" means here
 
-* `src/bdos.c` and `src/ccp.c` follow `orig/bdos.asm` and `orig/ccp.asm`
+* `src/os/bdos.c` and `src/os/ccp.c` follow `orig/os/bdos.asm` and `orig/os/ccp.asm`
   one routine at a time: same names, same variables, same control flow
   (`goto`s included).  Conditions the assembly returned in the Z/C flags are
   C return values; 8080 register pairs are `uint16_t`; 8-bit arithmetic is
@@ -17,7 +17,7 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
 * Everything that other code can see lives in the 64K CP/M address space (a
   `mem[]` array in the hosted and i386 builds, the CPU's own memory in the
   native Z80 build): FCBs, the command buffer, disk parameter headers/blocks, allocation and checksum
-  vectors, the DMA buffer.  The BIOS is the `cpm_bios` struct in `src/cpm.h`
+  vectors, the DMA buffer.  The BIOS is the `cpm_bios` struct in `src/os/cpm.h`
   (one member per BIOS jump-table entry).
 * It is **not** byte-identical code: a C compiler cannot reproduce the
   1980 hand-written 8080 object code.  Equivalence is established by
@@ -44,16 +44,16 @@ i686-elf-gcc qemu`.  `make` builds everything; build a single target with
 
 | path | what |
 | --- | --- |
-| `src/cpm.h` | memory map per target, BIOS interface, entry points |
-| `src/bdos.c`, `src/ccp.c` | the port (identical source for every target) |
-| `src/bios.c`, `src/plat.h`, `src/geom.h` | portable BIOS: disk tables, translation; platform interface |
-| `src/machine.c` | hosted/i386: 64K memory, boot, runs `.COM` programs |
-| `src/8080/` | the 8080 CPU core (runs `.COM` programs and the original binaries) |
-| `src/host.c` | test host: stdio console, disk image files, options |
-| `src/z80/` | Z80: the native build (SDCC: startup, BDOS entry, port I/O), plus the Z80 core and virtual Z80 machine used to test it |
-| `src/i386/` | bare-metal i386 build: multiboot stub, UART/ATA/QEMU platform |
-| `orig/` | original assembly |
-| `tools/` | `asm80.py` (8080 assembler for `orig/`), `mkdisk.py`, `mkimage.py`, `ihx2bin.py` |
+| `src/os/cpm.h` | memory map per target, BIOS interface, entry points |
+| `src/os/bdos.c`, `src/os/ccp.c` | the port (identical source for every target) |
+| `src/os/bios.c`, `src/os/plat.h`, `src/os/geom.h` | portable BIOS: disk tables, translation; platform interface |
+| `src/os/machine.c` | hosted/i386: 64K memory, boot, runs `.COM` programs |
+| `src/os/8080/` | the 8080 CPU core (runs `.COM` programs and the original binaries) |
+| `src/os/host.c` | test host: stdio console, disk image files, options |
+| `src/os/z80/` | Z80: the native build (SDCC: startup, BDOS entry, port I/O), plus the Z80 core and virtual Z80 machine used to test it |
+| `src/os/i386/` | bare-metal i386 build: multiboot stub, UART/ATA/QEMU platform |
+| `orig/os/` | original assembly |
+| `tools/` | `asm80.py` (8080 assembler for `orig/os/`), `mkdisk.py`, `mkimage.py`, `ihx2bin.py` |
 | `tests/` | differential test suite and test programs |
 
 ## Targets
@@ -74,7 +74,7 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   *is* the CP/M address space; programs run natively.  Memory map: TPA
   `0100`-`9FFF`, CCP data `A000`, BDOS entry page `A800`, compiled code from
   `A900` (about 10 KB), the BIOS tables at `F300`.  Console and disks are I/O
-  ports (`src/z80/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
+  ports (`src/os/z80/z80_ports.h`); `build/cpm -z build/z80/cpm.bin` runs the image
   on the Z80 core in the test host.  SDCC has no 8080 backend, so this is Z80
   code, not strict 8080 (`.COM` programs, being 8080 code, run fine on it).
 * **i386** (`make i386`): a freestanding 32-bit kernel (`i686-elf-gcc`, or
@@ -82,7 +82,7 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   the multiboot header or the PVH ELF note.  Console is COM1, the list device
   COM2, diagnostics COM3, and the disks live on an IDE disk
   (`tools/mkimage.py` builds the system disk; layout in
-  `src/i386/boot_hdr.h`).  `.COM` programs run on the same 8080 core as in the
+  `src/os/i386/boot_hdr.h`).  `.COM` programs run on the same 8080 core as in the
   hosted build.  The kernel has no interrupt table and never enables SSE, so
   it is compiled with `-mgeneral-regs-only` (`make check-i386` enforces it).
   `make run-i386` creates blank formatted disks in `build/disks/` if needed;
@@ -125,7 +125,7 @@ mounted.  Other options: `-r DIR` (run the original binaries), `-z FILE`
 ## How the port is tested
 
 `build/cpm -r build/ref ...` runs the **original** CCP and BDOS, assembled
-from `orig/` by `tools/asm80.py` at the standard 56K addresses
+from `orig/os/` by `tools/asm80.py` at the standard 56K addresses
 (CCP `DC00`, BDOS `E400`, BIOS `F200`), on the 8080 core, using the very same
 BIOS routines.  `tests/run_tests.py` feeds identical console input and
 identical starting disk images to the original and to each target (hosted C,
@@ -166,4 +166,4 @@ the same suite.  Dependabot keeps the actions up to date
 ## License
 
 The C port is BSD 3-Clause licensed; see `LICENSE`. The original assembly
-source is Copyright Digital Research; see `orig/LICENSE.txt`.
+source is Copyright Digital Research; see `orig/os/LICENSE.txt`.

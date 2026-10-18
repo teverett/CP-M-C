@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal 8080 assembler, just enough for orig/bdos.asm, orig/ccp.asm and
+"""Minimal 8080 assembler, just enough for orig/os/bdos.asm, orig/os/ccp.asm and
 the test programs.  Mimics the subset of Macro Assembler AS used there.
 
 usage: asm80.py [-D name=value]... -o out.bin [-s out.sym] file.asm

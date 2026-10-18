@@ -5,7 +5,7 @@ usage: mkimage.py -o sys.img [-A a.img] [-B b.img] [-C c.img] [-s script]
                   [-t] [-e TRACK] [-x N:D:OFF:V]
 
 Without -s the kernel runs interactively on the serial console.  See
-src/i386/boot_hdr.h for the layout.
+src/os/i386/boot_hdr.h for the layout.
 """
 import struct
 import sys

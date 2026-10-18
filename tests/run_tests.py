@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Differential tests: the original 8080 CCP+BDOS (assembled from orig/ and
+"""Differential tests: the original 8080 CCP+BDOS (assembled from orig/os/ and
 run on the emulated CPU) against the C port.  The same console script and
 the same starting disk images go into both; console output, exit status and
 the final disk images must be identical.

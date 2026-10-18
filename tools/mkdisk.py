@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a CP/M disk image for the test host (see src/host.c geometries).
+"""Build a CP/M disk image for the test host (see src/os/host.c geometries).
 
 usage: mkdisk.py TYPE out.img [USER:]NAME.EXT[;ro][;sys]=hostfile ...
    TYPE 0 = 8" IBM 3740 (drive A), 1 = 2K blocks/16-bit map (B),

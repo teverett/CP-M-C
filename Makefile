@@ -2,22 +2,22 @@ CC      ?= cc
 CFLAGS  ?= -std=c99 -Wall -Wextra -O2 -g
 PYTHON  ?= python3
 
-SRC = src/host.c src/z80/host_z80.c src/machine.c src/bios.c src/bdos.c \
-      src/ccp.c src/8080/i8080.c src/z80/z80.c
+SRC = src/os/host.c src/os/z80/host_z80.c src/os/machine.c src/os/bios.c src/os/bdos.c \
+      src/os/ccp.c src/os/8080/i8080.c src/os/z80/z80.c
 
 all: build/cpm build/ref/ccp.bin build/ref/bdos.bin z80 i386
 
-build/cpm: $(SRC) src/cpm.h src/8080/i8080.h src/plat.h src/geom.h src/machine.h \
-           src/host.h src/z80/z80.h src/z80/z80_ports.h
+build/cpm: $(SRC) src/os/cpm.h src/os/8080/i8080.h src/os/plat.h src/os/geom.h src/os/machine.h \
+           src/os/host.h src/os/z80/z80.h src/os/z80/z80_ports.h
 	@mkdir -p build
-	$(CC) $(CFLAGS) -DCPM_HOSTED -Isrc/8080 -Isrc/z80 -o $@ $(SRC)
+	$(CC) $(CFLAGS) -DCPM_HOSTED -Isrc/os/8080 -Isrc/os/z80 -o $@ $(SRC)
 
 # Reference binaries: the original assembly, at the 56K CP/M 2.2 addresses
-build/ref/ccp.bin: orig/ccp.asm tools/asm80.py
+build/ref/ccp.bin: orig/os/ccp.asm tools/asm80.py
 	@mkdir -p build/ref
 	$(PYTHON) tools/asm80.py -D origin=0dc00h -o $@ -s build/ref/ccp.sym $<
 
-build/ref/bdos.bin: orig/bdos.asm tools/asm80.py
+build/ref/bdos.bin: orig/os/bdos.asm tools/asm80.py
 	@mkdir -p build/ref
 	$(PYTHON) tools/asm80.py -D origin=0e400h -o $@ -s build/ref/bdos.sym $<
 
@@ -40,19 +40,19 @@ SDFLAGS  = -mz80 --std-c99 --opt-code-size
 
 z80: build/z80/cpm.bin
 
-build/z80/crt0.rel: src/z80/crt0.s
+build/z80/crt0.rel: src/os/z80/crt0.s
 	@mkdir -p build/z80
-	cd build/z80 && $(SDAS) -plosgff crt0.rel ../../src/z80/crt0.s
+	cd build/z80 && $(SDAS) -plosgff crt0.rel ../../src/os/z80/crt0.s
 
-Z80DEPS = src/cpm.h src/plat.h src/geom.h src/z80/z80_ports.h
+Z80DEPS = src/os/cpm.h src/os/plat.h src/os/geom.h src/os/z80/z80_ports.h
 
-build/z80/%.rel: src/%.c $(Z80DEPS)
+build/z80/%.rel: src/os/%.c $(Z80DEPS)
 	@mkdir -p build/z80
-	cd build/z80 && $(SDCC) $(SDFLAGS) -c ../../src/$*.c -o $*.rel
+	cd build/z80 && $(SDCC) $(SDFLAGS) -c ../../src/os/$*.c -o $*.rel
 
-build/z80/%.rel: src/z80/%.c $(Z80DEPS)
+build/z80/%.rel: src/os/z80/%.c $(Z80DEPS)
 	@mkdir -p build/z80
-	cd build/z80 && $(SDCC) $(SDFLAGS) -I../../src -c ../../src/z80/$*.c -o $*.rel
+	cd build/z80 && $(SDCC) $(SDFLAGS) -I../../src -c ../../src/os/z80/$*.c -o $*.rel
 
 build/z80/cpm.ihx: $(Z80OBJ)
 	cd build/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0xA900 \
@@ -72,7 +72,7 @@ QEMU386   ?= qemu-system-i386
 I386FLAGS  = -m32 -march=i686 -mgeneral-regs-only -ffreestanding -fno-pie \
              -fno-stack-protector -fcf-protection=none \
              -fno-asynchronous-unwind-tables -O2 -Wall -Wextra \
-             -Isrc -Isrc/i386 -Isrc/8080
+             -Isrc/os -Isrc/os/i386 -Isrc/os/8080
 I386SRC    = machine bios bdos ccp 8080/i8080
 I386OBJ    = build/i386/boot.o \
              $(addprefix build/i386/,$(addsuffix .o,$(notdir $(I386SRC)))) \
@@ -87,36 +87,36 @@ GRUBMKRESCUE ?= grub-mkrescue
 
 iso: build/cpm.iso
 
-build/cpm.iso: build/i386/kernel.elf src/i386/grub.cfg
+build/cpm.iso: build/i386/kernel.elf src/os/i386/grub.cfg
 	@mkdir -p build/iso/boot/grub
 	cp build/i386/kernel.elf build/iso/boot/kernel.elf
-	cp src/i386/grub.cfg build/iso/boot/grub/grub.cfg
+	cp src/os/i386/grub.cfg build/iso/boot/grub/grub.cfg
 	$(GRUBMKRESCUE) -o $@ build/iso
 
-build/i386/boot.o: src/i386/boot.s
+build/i386/boot.o: src/os/i386/boot.s
 	@mkdir -p build/i386
 	$(I386AS) $< -o $@
 
-I386DEPS = src/cpm.h src/plat.h src/geom.h src/machine.h src/8080/i8080.h
+I386DEPS = src/os/cpm.h src/os/plat.h src/os/geom.h src/os/machine.h src/os/8080/i8080.h
 
-build/i386/%.o: src/%.c $(I386DEPS)
+build/i386/%.o: src/os/%.c $(I386DEPS)
 	@mkdir -p build/i386
 	$(I386CC) $(I386FLAGS) -c $< -o $@
 
-build/i386/%.o: src/8080/%.c $(I386DEPS)
+build/i386/%.o: src/os/8080/%.c $(I386DEPS)
 	@mkdir -p build/i386
 	$(I386CC) $(I386FLAGS) -c $< -o $@
 
-build/i386/plat_i386.o: src/i386/plat_i386.c src/i386/boot_hdr.h src/cpm.h src/plat.h
+build/i386/plat_i386.o: src/os/i386/plat_i386.c src/os/i386/boot_hdr.h src/os/cpm.h src/os/plat.h
 	@mkdir -p build/i386
 	$(I386CC) $(I386FLAGS) -c $< -o $@
 
-build/i386/rt.o: src/i386/rt.c
+build/i386/rt.o: src/os/i386/rt.c
 	@mkdir -p build/i386
 	$(I386CC) $(I386FLAGS) -c $< -o $@
 
-build/i386/kernel.elf: $(I386OBJ) src/i386/link.ld
-	$(I386CC) -T src/i386/link.ld -o $@ -ffreestanding -nostdlib -no-pie -Wl,--build-id=none \
+build/i386/kernel.elf: $(I386OBJ) src/os/i386/link.ld
+	$(I386CC) -T src/os/i386/link.ld -o $@ -ffreestanding -nostdlib -no-pie -Wl,--build-id=none \
 	    $(I386OBJ) -lgcc
 
 # Fail if the kernel contains SSE/MMX/x87 instructions (it would reset in QEMU)
@@ -139,7 +139,7 @@ build/disks/C.img:
 	$(PYTHON) tools/mkdisk.py 2 $@
 
 # The system disk image for the i386 build: drives A/B/C packed into the
-# single IDE image the kernel reads (src/i386/boot_hdr.h). Rebuilt whenever
+# single IDE image the kernel reads (src/os/i386/boot_hdr.h). Rebuilt whenever
 # the per-drive images change; needed alongside build/cpm.iso for hypervisors
 # (e.g. Proxmox) that cannot use QEMU's -kernel flag directly.
 fsimage: build/disks/system.img
