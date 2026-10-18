@@ -149,6 +149,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.zip.outputs.tag }}
         run: |
+          # Idempotent: a re-run of this job (same run number/SHA) would
+          # otherwise fail here because the tag/release already exists.
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" "cpm22-c-${TAG}.zip" \
             --title "$TAG" \
             --target "$GITHUB_SHA" \
