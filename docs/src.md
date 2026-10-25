@@ -32,7 +32,7 @@ BIOS table `A880h`, disk data `F300h`).
 | --- | --- |
 | `host.c` | Command-line host: stdin/stdout console, disk image files, list output, disk fault and byte-injection options, instruction limit, BDOS tracing, and loading the original CCP/BDOS reference binaries. |
 | `host.h` | Private interface used to launch the native Z80 image on the hosted Z80 emulator. |
-| `machine.c` | Hosted/i386 64K machine. Initializes low-memory vectors and BIOS traps, boots and warm-boots the system, dispatches BIOS/BDOS calls, and runs transient programs on the 8080 core. In reference mode the original CCP and BDOS execute on that core against the same BIOS. |
+| `machine.c` | Hosted/i386 64K machine. Initializes low-memory vectors and BIOS traps, boots and warm-boots the system, dispatches BIOS/BDOS calls, and runs ordinary transient programs on the 8080 core. The named Z80 C utility COMs use a Z80 runner with BDOS traps; reference CCP/BDOS execute on the 8080 core against the same BIOS. |
 | `machine.h` | Machine-run interface and reference-binary, tracing, and execution-limit state. |
 | `8080/i8080.c`, `8080/i8080.h` | 8080 CPU state and single-instruction execution core used for transient `.COM` programs and the original reference binaries. |
 
@@ -43,6 +43,19 @@ reference implementation; `-z FILE` runs a native Z80 image on the Z80 core.
 `-e` injects a failing disk track, `-x` changes an image byte after a specified
 number of reads, and `-m` sets an emulated-instruction limit. See `host.c` for
 the complete option parsing and argument formats.
+
+## Standalone utility COMs
+
+`src/util/` contains standalone C implementations of ED, DUMP, LOAD, PIP,
+STAT, and SUBMIT. SDCC builds these as Z80 COM files; hosted/i386 dispatch
+these named programs through the Z80 core and trap their BDOS calls back into
+the system. PIP supports CP/M file copies, wildcard names, and drive-to-drive
+copies; the other utilities cover hexadecimal dumps, Intel HEX loading,
+directory/disk status, command-file expansion, and editing. `make z80-util-coms`
+builds the COM files, while `make utility-disk` creates a separate
+`build/disks/utilities-A.img` containing them without modifying user disk
+images. `tests/test_ed.py` and `tests/test_util.py` smoke-test the COM programs
+on hosted, native Z80, and i386 targets.
 
 ## Native Z80 target
 
@@ -89,6 +102,8 @@ The target rules are in `src/os/Makefile`, included by the top-level
 | `make build/cpm` | Hosted test executable using the portable C implementation and 8080 emulator. |
 | `make z80` | SDCC native Z80 image at `build/z80/cpm.bin`. |
 | `make i386` | Freestanding i386 kernel at `build/i386/kernel.elf`. |
+| `make z80-util-coms` | Standalone Z80 COM files in `build/util/z80/`. |
+| `make utility-disk` | Separate CP/M A: image containing all standalone utility COMs. |
 | `make test` | Top-level differential suite: runs equivalent console input and disk images against the original assembly reference and supported port targets, comparing output and resulting state. |
 | `make run-i386` | Boots the i386 kernel in QEMU with the system disk. |
 | `make fsimage`, `make iso` | Build the packed i386 disk image and bootable ISO, respectively. |

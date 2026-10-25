@@ -939,6 +939,9 @@ static const char comtype[] = "COM";
 static void userfunc(void)
 {
     uint8_t a, b;
+#if !defined(__SDCC)
+    uint8_t is_z80_utility;
+#endif
     uint16_t hl, de;
 
     serialize();                 /* check serialization */
@@ -958,6 +961,26 @@ static void userfunc(void)
         return;
     }
     /* user0: file name is present */
+#if !defined(__SDCC)
+    is_z80_utility = (uint8_t)(
+        (rb(COMFCB + 1) == 'E' && rb(COMFCB + 2) == 'D' &&
+         rb(COMFCB + 3) == ' ') ||
+        (rb(COMFCB + 1) == 'D' && rb(COMFCB + 2) == 'U' &&
+         rb(COMFCB + 3) == 'M' && rb(COMFCB + 4) == 'P' &&
+         rb(COMFCB + 5) == ' ') ||
+        (rb(COMFCB + 1) == 'P' && rb(COMFCB + 2) == 'I' &&
+         rb(COMFCB + 3) == 'P' && rb(COMFCB + 4) == ' ') ||
+        (rb(COMFCB + 1) == 'L' && rb(COMFCB + 2) == 'O' &&
+         rb(COMFCB + 3) == 'A' && rb(COMFCB + 4) == 'D' &&
+         rb(COMFCB + 5) == ' ') ||
+        (rb(COMFCB + 1) == 'S' && rb(COMFCB + 2) == 'T' &&
+         rb(COMFCB + 3) == 'A' && rb(COMFCB + 4) == 'T' &&
+         rb(COMFCB + 5) == ' ') ||
+        (rb(COMFCB + 1) == 'S' && rb(COMFCB + 2) == 'U' &&
+         rb(COMFCB + 3) == 'B' && rb(COMFCB + 4) == 'M' &&
+         rb(COMFCB + 5) == 'I' && rb(COMFCB + 6) == 'T' &&
+         rb(COMFCB + 7) == ' '));
+#endif
     de = COMFCB + 9;             /* type ' ' */
     if (rb(de) != ' ')
         comerr();
@@ -1019,7 +1042,12 @@ load1:                           /* end file is 1 */
     /* now go to the loaded program */
     setdmabuff();                /* default dma */
     saveuser();                  /* user code saved; diska contains user code */
-    ccp_run_tpa();               /* gone to the loaded program */
+#if !defined(__SDCC)
+    if (is_z80_utility)
+        ccp_run_z80_com();
+    else
+#endif
+        ccp_run_tpa();           /* gone to the loaded program */
     /* may come back here */
     setdiska();
     select_(cdisk);
@@ -1099,13 +1127,6 @@ void ccp_start(uint8_t c)
             comerr();            /* the name cannot be an ambiguous reference */
         if (sdisk != 0) {
             userfunc();
-            continue;
-        }
-        if (rb((uint16_t)(COMFCB + 1)) == 'E' &&
-            rb((uint16_t)(COMFCB + 2)) == 'D' &&
-            rb((uint16_t)(COMFCB + 3)) == ' ' &&
-            rb((uint16_t)(COMFCB + 9)) == ' ') {
-            ed_command(COMBUF, rb(COMLEN), cdisk);
             continue;
         }
         /* check for an intrinsic function */

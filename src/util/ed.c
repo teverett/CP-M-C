@@ -1,5 +1,5 @@
 /*
- * ed.c - CP/M-compatible context editor, called as an intrinsic by the C CCP.
+ * CP/M-compatible context editor implementation.
  *
  * The editor's text lives in unused TPA memory and disk/console access goes
  * through BDOS, so the same implementation works in hosted, i386, and Z80
@@ -7,19 +7,25 @@
  * the original PL/M ED; the buffer is kept in memory rather than streamed.
  */
 #include <stdint.h>
-#include "../../os/cpm.h"
+#include "../os/cpm.h"
 
 #define ED_CR       13
 #define ED_LF       10
 #define ED_EOF      0x1A
+#ifdef COM_PROGRAM
+#define ED_FCB      0x9E00u
+#define ED_TEXT     0x4000u
+#define ED_LIMIT    0x9C00u
+#else
 #define ED_FCB      (CCP_BASE + 0x500)
+#define ED_TEXT     0x0100u
+#define ED_LIMIT    (CCP_BASE - 0x0200u)
+#endif
 #define ED_SRC      ED_FCB
 #define ED_DST      (ED_FCB + 36)
 #define ED_LIB      (ED_FCB + 72)
 #define ED_XFER     (ED_FCB + 108)
 #define ED_IO       (ED_FCB + 144)
-#define ED_TEXT     0x0100u
-#define ED_LIMIT    (CCP_BASE - 0x0200u)
 #define ED_CAPACITY (ED_LIMIT - ED_TEXT)
 
 static uint16_t ed_length;
@@ -1007,15 +1013,19 @@ void ed_command(uint16_t command_buffer, uint8_t command_length,
         cmd[n++] = rb((uint16_t)(command_buffer + i));
     while (p < n && cmd[p] == ' ')
         p++;
-    while (p < n && cmd[p] != ' ')
-        p++;
-    while (p < n && cmd[p] == ' ')
-        p++;
+    if (n >= 3 && ed_uppercase(cmd[0]) == 'E' &&
+        ed_uppercase(cmd[1]) == 'D' && cmd[2] == ' ') {
+        while (p < n && cmd[p] != ' ')
+            p++;
+        while (p < n && cmd[p] == ' ')
+            p++;
+    }
     if (!ed_parse_fcb(cmd, n, &p, ED_SRC, 0)) {
         ed_puts("FILE NAME REQUIRED");
         ed_newline();
         return;
     }
+
     default_drive = current_drive;
     ed_upper = 0;
     ed_source_drive = rb(ED_SRC) ? (uint8_t)(rb(ED_SRC) - 1) : default_drive;
@@ -1070,3 +1080,11 @@ void ed_command(uint16_t command_buffer, uint8_t command_length,
     (void)len;
     ed_command_loop();
 }
+
+#ifdef COM_PROGRAM
+void main(void)
+{
+    uint8_t length = rb(0x0080);
+    ed_command(0x0081, length, (uint8_t)bdos_call(25, 0));
+}
+#endif

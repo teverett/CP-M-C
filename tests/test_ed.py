@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused smoke tests for the built-in BDOS-backed ED command."""
+"""Focused smoke tests for the standalone BDOS-backed ED COM program."""
 import os
 import tempfile
 
@@ -7,6 +7,9 @@ import run_tests
 
 
 DRIVE_A = run_tests.make_disk(0, [
+    (0, 'ED.COM', open(os.path.join(os.path.dirname(__file__),
+                                    '..', 'build', 'util', 'z80', 'ED.COM'),
+                       'rb').read()),
     (0, 'SAMPLE.TXT', b'first line\r\nsecond line\r\n\x1a'),
 ])
 

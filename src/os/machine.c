@@ -13,6 +13,7 @@
 #include "plat.h"
 #include "i8080.h"
 #include "machine.h"
+#include "z80/z80.h"
 
 #ifdef CPM_HOSTED
 #include <stdio.h>
@@ -212,6 +213,37 @@ static void run_tpa(void)
             ccp_start(cpu.c);
         }
         step();
+    }
+}
+
+static uint16_t z80_pop16(void)
+{
+    uint16_t value = rw(z80.sp);
+    z80.sp += 2;
+    return value;
+}
+
+void ccp_run_z80_com(void)
+{
+    z80 = (z80_t){0};
+    z80.sp = TPA_STACK;
+    ww(z80.sp, TPA_RETURN);
+    z80.pc = TRAN;
+    while (z80.pc != TPA_RETURN) {
+        if (++n_instr > machine_max_instr)
+            plat_limit();
+        if (z80.pc == BDOS_ENTRY) {
+            uint16_t result = bdos_call(z80.c, (uint16_t)((z80.d << 8) | z80.e));
+            z80.a = (uint8_t)result;
+            z80.b = (uint8_t)(result >> 8);
+            z80.h = (uint8_t)(result >> 8);
+            z80.l = (uint8_t)result;
+            z80.pc = z80_pop16();
+            continue;
+        }
+        z80_step();
+        if (z80.halted)
+            plat_halt(z80.pc);
     }
 }
 
