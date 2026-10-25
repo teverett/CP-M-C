@@ -1101,6 +1101,13 @@ void ccp_start(uint8_t c)
             userfunc();
             continue;
         }
+        if (rb((uint16_t)(COMFCB + 1)) == 'E' &&
+            rb((uint16_t)(COMFCB + 2)) == 'D' &&
+            rb((uint16_t)(COMFCB + 3)) == ' ' &&
+            rb((uint16_t)(COMFCB + 9)) == ' ') {
+            ed_command(COMBUF, rb(COMLEN), cdisk);
+            continue;
+        }
         /* check for an intrinsic function */
         i = intrinsic();
         switch (i) {

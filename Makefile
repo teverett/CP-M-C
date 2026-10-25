@@ -9,8 +9,12 @@ include orig/os/Makefile
 
 test: all
 	$(PYTHON) tests/run_tests.py
+	$(PYTHON) tests/test_ed.py
+
+test-ed: all
+	$(PYTHON) tests/test_ed.py
 
 clean:
 	rm -rf build
 
-.PHONY: all test clean
+.PHONY: all test test-ed clean

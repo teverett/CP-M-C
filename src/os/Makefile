@@ -4,7 +4,7 @@
 # the repo root, not to this file's directory.
 
 SRC = src/os/host.c src/os/z80/host_z80.c src/os/machine.c src/os/bios.c src/os/bdos.c \
-      src/os/ccp.c src/os/8080/i8080.c src/os/z80/z80.c
+      src/os/ccp.c src/util/ed/ed.c src/os/8080/i8080.c src/os/z80/z80.c
 
 build/cpm: $(SRC) src/os/cpm.h src/os/8080/i8080.h src/os/plat.h src/os/geom.h src/os/machine.h \
            src/os/host.h src/os/z80/z80.h src/os/z80/z80_ports.h
@@ -37,6 +37,12 @@ build/z80/%.rel: src/os/%.c $(Z80DEPS)
 build/z80/%.rel: src/os/z80/%.c $(Z80DEPS)
 	@mkdir -p build/z80
 	cd build/z80 && $(SDCC) $(SDFLAGS) -I../../src -c ../../src/os/z80/$*.c -o $*.rel
+
+build/z80/ed.rel: src/util/ed/ed.c $(Z80DEPS)
+	@mkdir -p build/z80
+	cd build/z80 && $(SDCC) $(SDFLAGS) -I../../src -c ../../src/util/ed/ed.c -o ed.rel
+
+Z80OBJ += build/z80/ed.rel
 
 build/z80/cpm.ihx: $(Z80OBJ)
 	cd build/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0xA900 \
@@ -90,6 +96,12 @@ build/i386/%.o: src/os/%.c $(I386DEPS)
 build/i386/%.o: src/os/8080/%.c $(I386DEPS)
 	@mkdir -p build/i386
 	$(I386CC) $(I386FLAGS) -c $< -o $@
+
+build/i386/ed.o: src/util/ed/ed.c $(I386DEPS)
+	@mkdir -p build/i386
+	$(I386CC) $(I386FLAGS) -c $< -o $@
+
+I386OBJ += build/i386/ed.o
 
 build/i386/plat_i386.o: src/os/i386/plat_i386.c src/os/i386/boot_hdr.h src/os/cpm.h src/os/plat.h
 	@mkdir -p build/i386

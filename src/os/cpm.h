@@ -138,6 +138,9 @@ void bdos_init(void);            /* cold-start the BDOS variables */
 void ccp_load(void);
 /* ccpstart: c = (user << 4) | disk.  Does not return. */
 void ccp_start(uint8_t c) NORETURN;
+/* Run the built-in CP/M context editor from the CCP command line. */
+void ed_command(uint16_t command_buffer, uint8_t command_length,
+                uint8_t current_drive);
 
 /* Run the transient program loaded at TRAN until it returns (RET) or jumps
  * to location 0 (which warm boots, not returning). */
