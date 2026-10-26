@@ -49,8 +49,8 @@ build/z80/cpm.bin: build/z80/cpm.ihx
 # the resident OS image and execute from the normal 0100h TPA address.
 z80-ed-com: build/util/z80/ED.COM
 
-UTIL_NAMES = ed dump load pip stat submit
-UTIL_COM_FILES = $(addprefix build/util/z80/,$(addsuffix .COM,ED DUMP LOAD PIP STAT SUBMIT))
+UTIL_NAMES = ed dump load pip stat submit mac
+UTIL_COM_FILES = $(addprefix build/util/z80/,$(addsuffix .COM,ED DUMP LOAD PIP STAT SUBMIT MAC BASIC BASICBAS BASICINT))
 
 z80-util-coms: $(UTIL_COM_FILES)
 
@@ -85,9 +85,60 @@ build/util/z80/STAT.COM: build/util/z80/stat.ihx tools/ihx2com.py
 build/util/z80/SUBMIT.COM: build/util/z80/submit.ihx tools/ihx2com.py
 	$(PYTHON) tools/ihx2com.py $< $@
 
+build/util/z80/mac.ihx: build/util/z80/mac.rel build/util/z80/util.rel \
+                       build/util/z80/comcrt0.rel build/util/z80/bdos.rel
+	cd build/util/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0x0100 \
+	    --data-loc 0x8000 comcrt0.rel bdos.rel util.rel mac.rel -o mac.ihx
+
+build/util/z80/MAC.COM: build/util/z80/mac.ihx tools/ihx2com.py
+	$(PYTHON) tools/ihx2com.py $< $@
+
+build/util/z80/basic.rel: src/basic-e/basic.c src/util/util.h src/os/cpm.h
+	@mkdir -p build/util/z80
+	cd build/util/z80 && $(SDCC) $(SDFLAGS) -DCOM_PROGRAM -I../../../src \
+	    -c ../../../src/basic-e/basic.c -o basic.rel
+
+build/util/z80/basic.ihx: build/util/z80/basic.rel build/util/z80/util.rel \
+                         build/util/z80/comcrt0.rel build/util/z80/bdos.rel
+	cd build/util/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0x0100 \
+	    --data-loc 0x6B00 comcrt0.rel bdos.rel util.rel basic.rel -o basic.ihx
+
+build/util/z80/BASICBAS.COM: build/util/z80/basic.ihx tools/ihx2com.py
+	$(PYTHON) tools/ihx2com.py $< $@
+
+build/util/z80/basic-launch.rel: src/basic-e/launcher.c src/util/util.h src/os/cpm.h
+	@mkdir -p build/util/z80
+	cd build/util/z80 && $(SDCC) $(SDFLAGS) -DCOM_PROGRAM -I../../../src \
+	    -c ../../../src/basic-e/launcher.c -o basic-launch.rel
+
+build/util/z80/basic-start.rel: src/basic-e/launcher_z80.s
+	@mkdir -p build/util/z80
+	cd build/util/z80 && $(SDAS) -plosgff basic-start.rel ../../../src/basic-e/launcher_z80.s
+
+build/util/z80/basic-launch.ihx: build/util/z80/basic-launch.rel build/util/z80/util.rel \
+                                build/util/z80/basic-start.rel build/util/z80/bdos.rel
+	cd build/util/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0x0100 \
+	    --data-loc 0x9000 basic-start.rel bdos.rel util.rel basic-launch.rel -o basic-launch.ihx
+
+build/util/z80/BASIC.COM: build/util/z80/basic-launch.ihx tools/ihx2com.py
+	$(PYTHON) tools/ihx2com.py $< $@
+
+build/util/z80/basic-int.rel: src/basic-e/int.c src/util/util.h src/os/cpm.h
+	@mkdir -p build/util/z80
+	cd build/util/z80 && $(SDCC) $(SDFLAGS) -DCOM_PROGRAM -I../../../src \
+	    -c ../../../src/basic-e/int.c -o basic-int.rel
+
+build/util/z80/basic-int.ihx: build/util/z80/basic-int.rel build/util/z80/util.rel \
+                             build/util/z80/comcrt0.rel build/util/z80/bdos.rel
+	cd build/util/z80 && $(SDCC) -mz80 --no-std-crt0 --code-loc 0x0100 \
+	    --data-loc 0x8300 comcrt0.rel bdos.rel util.rel basic-int.rel -o basic-int.ihx
+
+build/util/z80/BASICINT.COM: build/util/z80/basic-int.ihx tools/ihx2com.py
+	$(PYTHON) tools/ihx2com.py $< $@
+
 utility-disk: build/disks/utilities-A.img
 
-build/disks/utilities-A.img: $(UTIL_COM_FILES) tools/mkdisk.py
+build/disks/utilities-A.img: $(UTIL_COM_FILES) src/basic-e/demo.bas tools/mkdisk.py
 	@mkdir -p build/disks
 	$(PYTHON) tools/mkdisk.py 0 $@ \
 	    ED.COM=build/util/z80/ED.COM \
@@ -95,7 +146,12 @@ build/disks/utilities-A.img: $(UTIL_COM_FILES) tools/mkdisk.py
 	    LOAD.COM=build/util/z80/LOAD.COM \
 	    PIP.COM=build/util/z80/PIP.COM \
 	    STAT.COM=build/util/z80/STAT.COM \
-	    SUBMIT.COM=build/util/z80/SUBMIT.COM
+	    SUBMIT.COM=build/util/z80/SUBMIT.COM \
+	    MAC.COM=build/util/z80/MAC.COM \
+	    BASIC.COM=build/util/z80/BASIC.COM \
+	    BASICBAS.COM=build/util/z80/BASICBAS.COM \
+	    BASICINT.COM=build/util/z80/BASICINT.COM \
+	    DEMO.BAS=src/basic-e/demo.bas
 
 # --- bare-metal i386 build (run under QEMU) -------------------------------
 I386CC    ?= i686-elf-gcc

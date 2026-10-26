@@ -23,9 +23,12 @@ def hex_record(address, record_type, data):
 
 
 def build_disks():
+    long_assembly = (b'        ORG 0100H\r\n' +
+                    b'        NOP\r\n' * 64 +
+                    b'        END\r\n\x1a')
     files = [
         (0, name + '.COM', read_com(name))
-        for name in ('ED', 'DUMP', 'LOAD', 'PIP', 'STAT', 'SUBMIT')
+        for name in ('ED', 'DUMP', 'LOAD', 'PIP', 'STAT', 'SUBMIT', 'MAC')
     ]
     files.extend([
         (0, 'SAMPLE.BIN', bytes(range(32))),
@@ -33,6 +36,13 @@ def build_disks():
         (0, 'ONE.TXT', b'submit parameter worked\r\n\x1a'),
         (0, 'TWO.TXT', b'second submitted line\r\n\x1a'),
         (0, 'RUN.SUB', b'TYPE $0.TXT\r\nTYPE TWO.TXT\r\n'),
+        (0, 'HELLO.ASM',
+         b'        ORG 0100H\r\n'
+         b'START:  MVI A,41H\r\n'
+         b'        OUT 0\r\n'
+         b'        HLT\r\n'
+         b'        END\r\n\x1a'),
+        (0, 'LONG.ASM', long_assembly),
         (0, 'TEST.HEX',
          hex_record(0x0100, 0, b'\x00\x11\x22\x33') + b'\r\n' +
          hex_record(0, 1, b'') + b'\r\n\x1a'),
@@ -80,6 +90,13 @@ def main():
         ('stat disk', b'STAT DSK:\n', b'FREE BLOCKS', {'A': disks['A']}),
         ('submit', b'SUBMIT RUN one\n',
          (b'submit parameter worked\r\n', b'second submitted line\r\n'),
+         {'A': disks['A']}),
+        ('mac', b'MAC HELLO\nTYPE HELLO.HEX\n',
+         b':050100003E41D3007632', {'A': disks['A']}),
+        ('mac multi-record', b'MAC LONG\nTYPE LONG.HEX\n',
+         tuple(hex_record(0x0100 + offset, 0, bytes(16)) + b'\r\n'
+               for offset in range(0, 64, 16)) +
+         (hex_record(0, 1, b'') + b'\r\n',),
          {'A': disks['A']}),
     ]
     for mode in ('port', 'z80', 'i386'):

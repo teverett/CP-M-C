@@ -47,15 +47,25 @@ the complete option parsing and argument formats.
 ## Standalone utility COMs
 
 `src/util/` contains standalone C implementations of ED, DUMP, LOAD, PIP,
-STAT, and SUBMIT. SDCC builds these as Z80 COM files; hosted/i386 dispatch
+STAT, SUBMIT, and MAC. SDCC builds these as Z80 COM files; hosted/i386 dispatch
 these named programs through the Z80 core and trap their BDOS calls back into
 the system. PIP supports CP/M file copies, wildcard names, and drive-to-drive
 copies; the other utilities cover hexadecimal dumps, Intel HEX loading,
-directory/disk status, command-file expansion, and editing. `make z80-util-coms`
+directory/disk status, command-file expansion, editing, and 8080 assembly
+with labels, expressions, and common data directives. `make z80-util-coms`
 builds the COM files, while `make utility-disk` creates a separate
 `build/disks/utilities-A.img` containing them without modifying user disk
 images. `tests/test_ed.py` and `tests/test_util.py` smoke-test the COM programs
 on hosted, native Z80, and i386 targets.
+
+`src/basic-e/` supplies a BASIC-E adaptation built with the same Z80 BDOS
+helpers. `BASIC.COM` selects the `BASICBAS.COM` source interpreter or the
+`BASICINT.COM` original intermediate-file runtime. `BASIC NAME` runs
+`NAME.BAS` directly; `BASIC NAME.INT` loads compiled intermediate code.
+The overlays replace the launcher in the TPA to stay within the native
+Z80 memory limit. All three COMs are included on the utilities image and
+use the same hosted/i386 Z80 execution bridge. `tests/test_basic.py` and
+`tests/test_basic_int.py` exercise them on all three targets.
 
 ## Native Z80 target
 

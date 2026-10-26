@@ -979,7 +979,17 @@ static void userfunc(void)
         (rb(COMFCB + 1) == 'S' && rb(COMFCB + 2) == 'U' &&
          rb(COMFCB + 3) == 'B' && rb(COMFCB + 4) == 'M' &&
          rb(COMFCB + 5) == 'I' && rb(COMFCB + 6) == 'T' &&
-         rb(COMFCB + 7) == ' '));
+         rb(COMFCB + 7) == ' ') ||
+        (rb(COMFCB + 1) == 'B' && rb(COMFCB + 2) == 'A' &&
+         rb(COMFCB + 3) == 'S' && rb(COMFCB + 4) == 'I' &&
+         rb(COMFCB + 5) == 'C' &&
+         (rb(COMFCB + 6) == ' ' ||
+          (rb(COMFCB + 6) == 'B' && rb(COMFCB + 7) == 'A' &&
+           rb(COMFCB + 8) == 'S') ||
+          (rb(COMFCB + 6) == 'I' && rb(COMFCB + 7) == 'N' &&
+           rb(COMFCB + 8) == 'T'))) ||
+        (rb(COMFCB + 1) == 'M' && rb(COMFCB + 2) == 'A' &&
+         rb(COMFCB + 3) == 'C' && rb(COMFCB + 4) == ' '));
 #endif
     de = COMFCB + 9;             /* type ' ' */
     if (rb(de) != ' ')

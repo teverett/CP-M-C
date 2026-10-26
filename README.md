@@ -29,10 +29,10 @@ version, <https://github.com/brouhaha/cpm22>, includes DRI patch 01).
     make test                      # build everything and run the differential tests
     build/cpm -A a.img -i script   # run the C port on the hosted test machine
     make run-i386                  # boot CP/M on a bare-metal i386 kernel in QEMU
-    ./run.sh                       # boot with ED/DUMP/LOAD/PIP/STAT/SUBMIT on A:
+    ./run.sh                       # boot with utility COMs and BASIC on A:
     make iso                       # build a bootable ISO (BIOS/El Torito) -> build/cpm.iso
     make fsimage                   # build the i386 system disk -> build/disks/system.img
-    make utility-disk              # separate A: image with ED/DUMP/LOAD/PIP/STAT/SUBMIT
+    make utility-disk              # separate A: image with utility COMs and BASIC
 
 Prerequisites: a C compiler, `make` and Python 3 for the hosted build and the
 tests; [SDCC](https://sdcc.sourceforge.net/) for the Z80 build; an i386 cross
@@ -103,7 +103,12 @@ The same `bdos.c`/`ccp.c`/`bios.c` build three ways:
   (e.g. handing both files to Proxmox).
 * **utility-disk** (`make utility-disk`): creates the separate CP/M A: image
   `build/disks/utilities-A.img` containing ED.COM, DUMP.COM, LOAD.COM, PIP.COM,
-  STAT.COM, and SUBMIT.COM. It does not modify user-managed `A.img` or
+  STAT.COM, SUBMIT.COM, and BASIC.COM. BASIC reads and runs `.BAS` source
+  directly (`BASIC DEMO` runs `DEMO.BAS`), or loads original intermediate
+  files with `BASIC NAME.INT`; its C source is in `src/basic-e/`.
+  The image includes the required `BASICBAS.COM` and `BASICINT.COM` overlays.
+  The image includes `DEMO.BAS` so it can be run immediately after boot.
+  It does not modify user-managed `A.img` or
   `system.img`.
 * **iso** (`make iso`): wraps `build/i386/kernel.elf` in a GRUB/El Torito
   bootable ISO (`build/cpm.iso`) for hypervisors that boot from CD rather than

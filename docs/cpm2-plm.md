@@ -92,11 +92,20 @@ do not fully specify how it relates to the PIP source or executable.
 
 ## Prebuilt artifacts
 
-The directory also includes opaque `.COM` binaries for `ASM`, `DDT`, `DUMP`,
-`ED`, `ED1`, `LIB`, `LINK`, `LOAD`, `MAC`, `MOVCPM`, `MOVCPM1`, `PIP`,
-`STAT`, `SUBMIT`, `SYSGEN`, `SYSGEN1`, and `XSUB`, as well as `PIP22.CMD`.
-There is no source here for several of these tools, including `LIB`, `LINK`,
-and `MAC`. The archive does not document the variant differences between
+The directory also includes `.COM` binaries for `ASM`, `DDT`, `DUMP`, `ED`,
+`ED1`, `LIB`, `LINK`, `LOAD`, `MAC`, `MOVCPM`, `MOVCPM1`, `PIP`, `STAT`,
+`SUBMIT`, `SYSGEN`, `SYSGEN1`, and `XSUB`, as well as `PIP22.CMD`.
+`MAC-IMAGE.ASM` is a byte-preserving 8080 control-flow disassembly of
+`MAC.COM`. It renders reachable instructions as mnemonics and retains
+unreachable bytes as `DB` data, with printable ASCII runs rendered as
+assembler string literals; indirect control flow can leave executable bytes
+undecoded. Regenerate it with
+`python3 tools/dis8080.py orig/cpm2-plm/MAC.COM -o orig/cpm2-plm/MAC-IMAGE.ASM`
+and assemble it with `python3 tools/asm80.py -o build/MAC.COM
+orig/cpm2-plm/MAC-IMAGE.ASM`. The generated image reproduces the binary
+exactly; this is not the original MAC source. There is no source here for
+several other tools, including `LIB` and `LINK`. The archive does not
+document the variant differences between
 `ED.COM`/`ED1.COM`, `MOVCPM.COM`/`MOVCPM1.COM`, or
 `SYSGEN.COM`/`SYSGEN1.COM`; do not infer them from the filenames alone.
 
